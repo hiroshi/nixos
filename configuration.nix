@@ -93,6 +93,7 @@
     openFirewall = true;
   };
 
+  # NOTE: `tailscale up` for the first time. Also don't forget to disable key expiry.
   services.tailscale.enable = true;
 
   # Open ports in the firewall.
