@@ -102,6 +102,8 @@
   services.k3s = {
     enable = true;
     role = "server";
+    # Let members of "wheel" (e.g. hiroshi) run `k3s kubectl` without sudo.
+    extraFlags = "--write-kubeconfig-mode=640 --write-kubeconfig-group=wheel";
   };
 
   # Open ports in the firewall.
