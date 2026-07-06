@@ -7,6 +7,14 @@
 {
   boot.kernelModules = [ "loop" ];
 
+  # lvmd runs in a privileged container with hostPID and drives LVM via
+  # `nsenter --target 1 --mount -- /sbin/lvm ...`, i.e. it expects an
+  # absolute /sbin/lvm path on the host. NixOS has no /sbin, so provide one.
+  systemd.tmpfiles.rules = [
+    "d /sbin 0755 root root -"
+    "L+ /sbin/lvm - - - - /run/current-system/sw/bin/lvm"
+  ];
+
   systemd.services.topolvm-lvm-setup = {
     description = "Create loopback-backed LVM volume group for TopoLVM";
     wantedBy = [ "multi-user.target" ];
