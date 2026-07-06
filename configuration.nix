@@ -67,7 +67,7 @@
   # List packages installed in system profile.
   # You can use https://search.nixos.org/ to find more packages (and options).
   environment.systemPackages = with pkgs; [
-    git
+    git k3s
   ];
 
   environment.etc."gitconfig".text = ''
@@ -97,6 +97,11 @@
 
   # NOTE: `tailscale up` for the first time. Also don't forget to disable key expiry.
   services.tailscale.enable = true;
+
+  services.k3s = {
+    enable = true;
+    role = "server";
+  };
 
   # Open ports in the firewall.
   # networking.firewall.allowedTCPPorts = [ ... ];
