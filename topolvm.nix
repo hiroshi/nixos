@@ -7,6 +7,14 @@
 {
   boot.kernelModules = [ "loop" ];
 
+  # lvmd runs in a privileged container with hostPID and drives LVM via
+  # `nsenter --target 1 --mount -- /sbin/lvm ...`, i.e. it expects an
+  # absolute /sbin/lvm path on the host. NixOS has no /sbin, so provide one.
+  systemd.tmpfiles.rules = [
+    "d /sbin 0755 root root -"
+    "L+ /sbin/lvm - - - - /run/current-system/sw/bin/lvm"
+  ];
+
   systemd.services.topolvm-lvm-setup = {
     description = "Create loopback-backed LVM volume group for TopoLVM";
     wantedBy = [ "multi-user.target" ];
@@ -51,6 +59,17 @@
     values = {
       # Single-node cluster: no need for a redundant leader-election replica.
       controller.replicaCount = 1;
+      lvmd.deviceClasses = [
+        {
+          name = "ssd";
+          volume-group = "myvg1";
+          default = true;
+          # The chart's default spare-gb (10) is a safety margin reserved as
+          # unallocatable; our VG is only 10G total, so that default would
+          # leave zero usable capacity. Keep a smaller margin instead.
+          spare-gb = 1;
+        }
+      ];
     };
   };
 }
