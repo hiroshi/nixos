@@ -59,6 +59,17 @@
     values = {
       # Single-node cluster: no need for a redundant leader-election replica.
       controller.replicaCount = 1;
+      lvmd.deviceClasses = [
+        {
+          name = "ssd";
+          volume-group = "myvg1";
+          default = true;
+          # The chart's default spare-gb (10) is a safety margin reserved as
+          # unallocatable; our VG is only 10G total, so that default would
+          # leave zero usable capacity. Keep a smaller margin instead.
+          spare-gb = 1;
+        }
+      ];
     };
   };
 }
