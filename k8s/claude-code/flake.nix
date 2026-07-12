@@ -15,20 +15,15 @@
               builtins.elem (nixpkgs.lib.getName pkg) [ "claude-code" ];
           };
         in {
-          docker = pkgs.dockerTools.buildLayeredImage {
-            name = "claude-code";
-            tag = "latest";
-            contents = [
+          env = pkgs.symlinkJoin {
+            name = "claude-code-env";
+            paths = [
               pkgs.claude-code
               pkgs.bashInteractive
               pkgs.coreutils
               # pkgs.git
               # pkgs.cacert
             ];
-            config = {
-              # Env = [ "SHELL=/bin/bash" ];
-              Entrypoint = [ "/bin/claude" ];
-            };
           };
         });
     };
