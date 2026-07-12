@@ -14,11 +14,10 @@ RUN nix build --impure \
 
 # closure(依存パス一覧)をそのまま /rootfs にコピーし、
 # 実行しやすいよう安定したパスへシンボリックリンクを張っておく
-RUN mkdir -p /rootfs/usr/bin /rootfs/bin && \
+RUN mkdir -p /rootfs/usr /rootfs/bin && \
     nix-store -qR /result | xargs -I{} cp -a --parents {} /rootfs/ && \
-    ln -s "$(readlink -f /result)/bin/claude" /rootfs/usr/bin/claude && \
-    ln -s "$(readlink -f /result)/bin/bash"   /rootfs/usr/bin/bash && \
-    ln -s "$(readlink -f /result)/bin/bash"   /rootfs/bin/sh
+    ln -s "$(readlink -f /result)/bin" /rootfs/usr/bin && \
+    ln -s /usr/bin/bash /rootfs/bin/sh
 
 FROM scratch
 COPY --from=builder /rootfs /
