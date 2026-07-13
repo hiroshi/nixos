@@ -22,5 +22,16 @@ RUN mkdir -p /rootfs/usr /rootfs/bin && \
 FROM scratch
 COPY --from=builder /rootfs /
 ENV SHELL=/usr/bin/bash
-WORKDIR /workspace
+ENV HOME=/home/claude
+
+# scratchベースで /etc/passwd が無いため、非rootユーザー(claude, uid/gid 1000)を
+# 自前で用意する。HOME配下はPVマウント先として使うのでその所有者にしておく。
+RUN mkdir -p /home/claude/workspace /tmp && \
+    echo "claude:x:1000:1000:claude:/home/claude:/usr/bin/bash" > /etc/passwd && \
+    echo "claude:x:1000:" > /etc/group && \
+    chown -R 1000:1000 /home/claude && \
+    chmod 1777 /tmp
+
+USER claude
+WORKDIR /home/claude/workspace
 ENTRYPOINT ["/usr/bin/claude"]
