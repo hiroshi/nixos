@@ -5,6 +5,9 @@ RUN echo "experimental-features = nix-command flakes" >> /etc/nix/nix.conf
 
 WORKDIR /src
 COPY flake.nix ./
+# flake.lock をコミットせず nixpkgs-unstable を都度追従する構成のため、
+# ビルドのたびに再解決されるようキャッシュを無効化する(CACHEBUSTはMakefile側で都度変える)。
+ARG CACHEBUST=1
 RUN nix flake lock --impure
 
 ENV NIXPKGS_ALLOW_UNFREE=1

@@ -1,0 +1,29 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: claude-code
+  namespace: default
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: claude-code
+  template:
+    metadata:
+      labels:
+        app: claude-code
+    spec:
+      securityContext:
+        fsGroup: 1000
+      containers:
+        - name: claude-code
+          image: ghcr.io/hiroshi/claude-code:latest
+          command: ["/usr/bin/claude"]
+          args: ["remote-control"]
+          volumeMounts:
+            - name: home
+              mountPath: /home/claude
+      volumes:
+        - name: home
+          persistentVolumeClaim:
+            claimName: claude-code-home
