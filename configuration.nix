@@ -106,6 +106,10 @@
     extraFlags = "--write-kubeconfig-mode=640 --write-kubeconfig-group=wheel";
   };
 
+  # kube-apiserver(6443)はTailscaleインターフェース越しにのみ開放する
+  # (LANや他のインターフェースには公開しない)。
+  networking.firewall.interfaces.tailscale0.allowedTCPPorts = [ 6443 ];
+
   # Open ports in the firewall.
   # networking.firewall.allowedTCPPorts = [ ... ];
   # networking.firewall.allowedUDPPorts = [ ... ];
