@@ -1,7 +1,7 @@
 IMAGE := ghcr.io/hiroshi/claude-code:latest
 
 build:
-	docker build --platform linux/amd64 --build-arg CACHEBUST=$$(date +%s) -t $(IMAGE) ./
+	docker build --platform linux/amd64 -t $(IMAGE) ./
 
 push:
 	docker push $(IMAGE)
