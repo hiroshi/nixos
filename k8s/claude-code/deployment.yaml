@@ -19,8 +19,9 @@ spec:
       containers:
         - name: claude-code
           image: ${IMAGE}
-          command: ["/usr/bin/claude"]
-          args: ["remote-control"]
+          command: ["/usr/bin/bash", "-c"]
+          args:
+            - "/usr/bin/claude remote-control --continue || exec /usr/bin/claude remote-control"
           volumeMounts:
             - name: home
               mountPath: /home/claude
