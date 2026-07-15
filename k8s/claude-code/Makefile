@@ -1,4 +1,6 @@
-IMAGE := ghcr.io/hiroshi/claude-code:latest
+REGISTRY := ghcr.io/hiroshi/claude-code
+TAG = $(shell git rev-parse --short=12 HEAD)
+IMAGE = $(REGISTRY):$(TAG)
 
 build:
 	docker build --platform linux/amd64 -t $(IMAGE) ./
@@ -20,4 +22,4 @@ enable-remote-control: ARGS=remote-control
 enable-remote-control: claude-code-run
 
 deploy: pvc
-	kubectl apply -f deployment.yaml
+	sed 's#image: .*#image: $(IMAGE)#' deployment.yaml | kubectl apply -f -
