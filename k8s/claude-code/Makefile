@@ -22,4 +22,4 @@ enable-remote-control: ARGS=remote-control
 enable-remote-control: claude-code-run
 
 deploy: pvc
-	sed 's#image: .*#image: $(IMAGE)#' deployment.yaml | kubectl apply -f -
+	IMAGE=$(IMAGE) envsubst '$${IMAGE}' < deployment.yaml | kubectl apply -f -
