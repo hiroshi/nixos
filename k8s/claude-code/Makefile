@@ -11,15 +11,18 @@ push:
 pvc:
 	kubectl apply -f pvc.yaml
 
+rbac:
+	kubectl apply -f rbac.yaml
+
 ARGS ?=
-claude-code-run: pvc
+claude-code-run: pvc rbac
 	kubectl run claude-code-run --rm -it --restart=Never \
 		--image=$(IMAGE) \
-		--overrides='{"spec":{"securityContext":{"fsGroup":1000},"containers":[{"name":"claude-code-run","image":"$(IMAGE)","command":["/usr/bin/claude"],"args":$(if $(ARGS),["$(ARGS)"],[]),"stdin":true,"tty":true,"volumeMounts":[{"name":"home","mountPath":"/home/claude"}]}],"volumes":[{"name":"home","persistentVolumeClaim":{"claimName":"claude-code-home"}}]}}' \
+		--overrides='{"spec":{"securityContext":{"fsGroup":1000},"serviceAccountName":"claude-code","containers":[{"name":"claude-code-run","image":"$(IMAGE)","command":["/usr/bin/claude"],"args":$(if $(ARGS),["$(ARGS)"],[]),"stdin":true,"tty":true,"volumeMounts":[{"name":"home","mountPath":"/home/claude"}]}],"volumes":[{"name":"home","persistentVolumeClaim":{"claimName":"claude-code-home"}}]}}' \
 		-- /usr/bin/claude $(ARGS)
 
 enable-remote-control: ARGS=remote-control
 enable-remote-control: claude-code-run
 
-deploy: pvc
+deploy: pvc rbac
 	IMAGE=$(IMAGE) envsubst '$${IMAGE}' < deployment.yaml | kubectl apply -f -

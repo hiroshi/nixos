@@ -13,6 +13,7 @@ spec:
       labels:
         app: claude-code
     spec:
+      serviceAccountName: claude-code
       securityContext:
         fsGroup: 1000
       containers:
