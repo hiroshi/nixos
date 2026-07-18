@@ -21,6 +21,7 @@
               pkgs.claude-code
               pkgs.bashInteractive
               pkgs.coreutils
+              pkgs.kubectl
               # pkgs.git
               # pkgs.cacert
             ];

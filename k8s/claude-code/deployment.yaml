@@ -13,13 +13,15 @@ spec:
       labels:
         app: claude-code
     spec:
+      serviceAccountName: claude-code
       securityContext:
         fsGroup: 1000
       containers:
         - name: claude-code
-          image: ghcr.io/hiroshi/claude-code:latest
-          command: ["/usr/bin/claude"]
-          args: ["remote-control"]
+          image: ${IMAGE}
+          command: ["/usr/bin/bash", "-c"]
+          args:
+            - "/usr/bin/claude remote-control --continue || exec /usr/bin/claude remote-control"
           volumeMounts:
             - name: home
               mountPath: /home/claude
