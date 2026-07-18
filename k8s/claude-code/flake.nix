@@ -22,8 +22,9 @@
               pkgs.bashInteractive
               pkgs.coreutils
               pkgs.kubectl
-              # pkgs.git
-              # pkgs.cacert
+              pkgs.git
+              pkgs.gh
+              pkgs.cacert
             ];
           };
         });

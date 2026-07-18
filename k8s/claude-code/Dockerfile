@@ -14,15 +14,19 @@ RUN nix build --impure \
 
 # Copy the closure (dependency paths) as-is into /rootfs, and add symlinks
 # at stable paths for easier execution.
-RUN mkdir -p /rootfs/usr /rootfs/bin && \
+RUN mkdir -p /rootfs/usr /rootfs/bin /rootfs/etc/ssl/certs && \
     nix-store -qR /result | xargs -I{} cp -a --parents {} /rootfs/ && \
     ln -s "$(readlink -f /result)/bin" /rootfs/usr/bin && \
-    ln -s /usr/bin/bash /rootfs/bin/sh
+    ln -s /usr/bin/bash /rootfs/bin/sh && \
+    ln -s "$(readlink -f /result)/etc/ssl/certs/ca-bundle.crt" /rootfs/etc/ssl/certs/ca-bundle.crt
 
 FROM scratch
 COPY --from=builder /rootfs /
 ENV SHELL=/usr/bin/bash
 ENV HOME=/home/claude
+ENV SSL_CERT_FILE=/etc/ssl/certs/ca-bundle.crt
+ENV NIX_SSL_CERT_FILE=/etc/ssl/certs/ca-bundle.crt
+ENV GIT_SSL_CAINFO=/etc/ssl/certs/ca-bundle.crt
 
 # scratch has no /etc/passwd, so create a non-root user (claude, uid/gid 1000)
 # ourselves. Own HOME by that user since it's used as a PV mount point.
