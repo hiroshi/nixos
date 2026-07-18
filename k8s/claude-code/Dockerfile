@@ -36,6 +36,28 @@ RUN mkdir -p /home/claude/workspace /tmp && \
     chown -R 1000:1000 /home/claude && \
     chmod 1777 /tmp
 
+# Rootless podman needs newuidmap/newgidmap to be setuid-root to create
+# multi-uid user namespaces (NixOS normally wraps these via the podman
+# module; we're bypassing that module here, so do it by hand), plus a
+# subuid/subgid range delegated to claude and the usual /etc/containers
+# config. driver=vfs avoids needing overlay/fuse-overlayfs privileges,
+# at the cost of using more disk per layer.
+RUN chown 0:0 /usr/bin/newuidmap /usr/bin/newgidmap && \
+    chmod u+s /usr/bin/newuidmap /usr/bin/newgidmap && \
+    echo "claude:100000:65536" > /etc/subuid && \
+    echo "claude:100000:65536" > /etc/subgid && \
+    mkdir -p /etc/containers \
+             /home/claude/.local/share/containers/storage \
+             /tmp/containers/storage \
+             /tmp/run-claude && \
+    echo '{"default":[{"type":"insecureAcceptAnything"}]}' > /etc/containers/policy.json && \
+    printf 'unqualified-search-registries = ["docker.io"]\n' > /etc/containers/registries.conf && \
+    printf '[storage]\ndriver = "vfs"\ngraphroot = "/home/claude/.local/share/containers/storage"\nrunroot = "/tmp/containers/storage"\n' > /etc/containers/storage.conf && \
+    printf '[engine]\ncgroup_manager = "cgroupfs"\nevents_logger = "file"\n' > /etc/containers/containers.conf && \
+    chown -R 1000:1000 /home/claude/.local /tmp/containers /tmp/run-claude
+
+ENV XDG_RUNTIME_DIR=/tmp/run-claude
+
 USER claude
 WORKDIR /home/claude/workspace
 ENTRYPOINT ["/usr/bin/claude"]
