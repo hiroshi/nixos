@@ -25,6 +25,11 @@
               pkgs.git
               pkgs.gh
               pkgs.cacert
+              pkgs.podman
+              pkgs.crun
+              pkgs.conmon
+              pkgs.slirp4netns
+              pkgs.fuse-overlayfs
             ];
           };
         });

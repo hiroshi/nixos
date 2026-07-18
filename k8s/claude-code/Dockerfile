@@ -36,6 +36,29 @@ RUN mkdir -p /home/claude/workspace /tmp && \
     chown -R 1000:1000 /home/claude && \
     chmod 1777 /tmp
 
+# Deliberately no /etc/subuid or /etc/subgid entries and no setuid
+# newuidmap/newgidmap here (unlike the claude-code-podman branch/PR #7):
+# with no subordinate ID range delegated, rootless podman should fall
+# back to a single-UID mapping (claude's own uid mapped to root inside
+# the container) that it can set up itself via a plain unprivileged
+# unshare()+write to uid_map, without ever invoking the setuid newuidmap
+# helper. This avoids the "newuidmap: write to uid_map failed: Operation
+# not permitted" failure hit under the pod's current securityContext,
+# at the cost of every file in built/pulled layers appearing as a single
+# UID (multi-UID ownership fidelity is lost). driver=vfs avoids needing
+# overlay/fuse-overlayfs privileges, at the cost of using more disk per layer.
+RUN mkdir -p /etc/containers \
+             /home/claude/.local/share/containers/storage \
+             /tmp/containers/storage \
+             /tmp/run-claude && \
+    echo '{"default":[{"type":"insecureAcceptAnything"}]}' > /etc/containers/policy.json && \
+    printf 'unqualified-search-registries = ["docker.io"]\n' > /etc/containers/registries.conf && \
+    printf '[storage]\ndriver = "vfs"\ngraphroot = "/home/claude/.local/share/containers/storage"\nrunroot = "/tmp/containers/storage"\nignore_chown_errors = "true"\n' > /etc/containers/storage.conf && \
+    printf '[engine]\ncgroup_manager = "cgroupfs"\nevents_logger = "file"\n' > /etc/containers/containers.conf && \
+    chown -R 1000:1000 /home/claude/.local /tmp/containers /tmp/run-claude
+
+ENV XDG_RUNTIME_DIR=/tmp/run-claude
+
 USER claude
 WORKDIR /home/claude/workspace
 ENTRYPOINT ["/usr/bin/claude"]
