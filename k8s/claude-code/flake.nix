@@ -25,6 +25,7 @@
               pkgs.git
               pkgs.gh
               pkgs.cacert
+              pkgs.docker-client
             ];
           };
         });
