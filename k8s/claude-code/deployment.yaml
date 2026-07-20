@@ -29,7 +29,12 @@ spec:
           image: ${IMAGE}
           command: ["/usr/bin/bash", "-c"]
           args:
-            - "/usr/bin/claude remote-control --continue || exec /usr/bin/claude remote-control"
+            # --spawn=worktree: the pre-created (--continue'd) session stays
+            # in this cwd, but every new on-demand session opened from
+            # claude.app gets its own isolated git worktree instead of
+            # sharing this directory, so concurrent sessions can't clobber
+            # each other's edits in myapp/nixos.
+            - "/usr/bin/claude remote-control --continue --spawn=worktree || exec /usr/bin/claude remote-control --spawn=worktree"
           env:
             - name: DOCKER_HOST
               value: unix:///var/run/docker.sock
