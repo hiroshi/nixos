@@ -45,9 +45,21 @@ spec:
           volumeMounts:
             - name: docker-sock
               mountPath: /var/run
+            # dockerd's default /var/lib/docker sits on the pod's own
+            # virtiofs-backed rootfs, and overlay2 can't mount on top of
+            # virtiofs ("invalid argument"), so dockerd falls back to the
+            # vfs storage driver, which doesn't support xattrs and breaks
+            # multi-stage `COPY --chown` builds. Moving the data root to a
+            # tmpfs emptyDir lets overlay2 mount successfully instead.
+            - name: docker-data
+              mountPath: /var/lib/docker
       volumes:
         - name: home
           persistentVolumeClaim:
             claimName: claude-code-home
         - name: docker-sock
           emptyDir: {}
+        - name: docker-data
+          emptyDir:
+            medium: Memory
+            sizeLimit: 4Gi
