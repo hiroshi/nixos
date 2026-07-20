@@ -13,19 +13,41 @@ spec:
       labels:
         app: claude-code
     spec:
+      # Runs the whole pod inside a Kata Containers hardware VM, so the
+      # dockerd sidecar's `privileged: true` is contained by the hypervisor
+      # boundary instead of just Linux namespaces/capabilities.
+      runtimeClassName: kata
       serviceAccountName: claude-code
       securityContext:
         fsGroup: 1000
+        # docker:27-dind's dind entrypoint chowns docker.sock to its "docker"
+        # group (GID 2375), overriding fsGroup's setgid inheritance, so the
+        # claude-code container needs that GID explicitly to reach the socket.
+        supplementalGroups: [2375]
       containers:
         - name: claude-code
           image: ${IMAGE}
           command: ["/usr/bin/bash", "-c"]
           args:
             - "/usr/bin/claude remote-control --continue || exec /usr/bin/claude remote-control"
+          env:
+            - name: DOCKER_HOST
+              value: unix:///var/run/docker.sock
           volumeMounts:
             - name: home
               mountPath: /home/claude
+            - name: docker-sock
+              mountPath: /var/run
+        - name: dockerd
+          image: docker:27-dind
+          securityContext:
+            privileged: true
+          volumeMounts:
+            - name: docker-sock
+              mountPath: /var/run
       volumes:
         - name: home
           persistentVolumeClaim:
             claimName: claude-code-home
+        - name: docker-sock
+          emptyDir: {}
