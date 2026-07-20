@@ -33,6 +33,12 @@ in
     "/dev/vhost-vsock rwm"
     "/dev/vhost-net rwm"
     "/dev/net/tun rwm"
+    # Not kata-related: setting DeviceAllow at all switches this unit's
+    # device cgroup from unrestricted to an allowlist, and kubelet itself
+    # (independent of kata) needs to open /dev/kmsg. Omitting this broke
+    # k3s entirely on first rollout (kubelet failed to start -> whole k3s
+    # process shut down, apiserver included).
+    "/dev/kmsg rwm"
   ];
   systemd.services.k3s.serviceConfig.Delegate = "yes";
 
