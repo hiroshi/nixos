@@ -20,6 +20,10 @@ spec:
       serviceAccountName: claude-code
       securityContext:
         fsGroup: 1000
+        # docker:27-dind's dind entrypoint chowns docker.sock to its "docker"
+        # group (GID 2375), overriding fsGroup's setgid inheritance, so the
+        # claude-code container needs that GID explicitly to reach the socket.
+        supplementalGroups: [2375]
       containers:
         - name: claude-code
           image: ${IMAGE}
