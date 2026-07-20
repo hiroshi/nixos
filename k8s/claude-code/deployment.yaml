@@ -29,7 +29,14 @@ spec:
           image: ${IMAGE}
           command: ["/usr/bin/bash", "-c"]
           args:
-            - "/usr/bin/claude remote-control --continue || exec /usr/bin/claude remote-control"
+            # --continue can't be combined with --capacity/--spawn (confirmed
+            # via a live failure), and worktree mode needs cwd to be a git
+            # repo (this workspace dir isn't one). Simpler tradeoff: give up
+            # automatic --continue on redeploy (it wasn't reliably resuming
+            # conversation context across pod restarts anyway) in exchange
+            # for same-dir mode supporting up to 32 concurrent claude.app
+            # sessions in this one workspace directory.
+            - "/usr/bin/claude remote-control --capacity=32"
           env:
             - name: DOCKER_HOST
               value: unix:///var/run/docker.sock
