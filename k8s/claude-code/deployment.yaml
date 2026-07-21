@@ -39,7 +39,7 @@ spec:
             - "/usr/bin/claude remote-control --capacity=32"
           env:
             - name: DOCKER_HOST
-              value: unix:///var/run/docker.sock
+              value: unix:///run/docker-sock/docker.sock
           # Without an explicit memory limit, Kata sizes the guest VM off
           # its own small default (~2GB) instead of the host's real
           # capacity, and --capacity=32 sessions OOMKilled the container
@@ -53,14 +53,24 @@ spec:
             - name: home
               mountPath: /home/claude
             - name: docker-sock
-              mountPath: /var/run
+              mountPath: /run/docker-sock
         - name: dockerd
           image: docker:27-dind
+          # Only docker.sock needs to be shared with the claude-code
+          # container, so it gets its own subdirectory instead of all of
+          # /var/run. Sharing the whole of /var/run would also share
+          # containerd's exec-root (pidfiles etc.), which lives on the
+          # emptyDir and therefore survives container restarts within the
+          # pod unlike the container's own rootfs — a stale pidfile left
+          # behind by an unclean shutdown then makes the next start refuse
+          # to run, thinking the old (reused) PID is still containerd.
+          args:
+            - --host=unix:///run/docker-sock/docker.sock
           securityContext:
             privileged: true
           volumeMounts:
             - name: docker-sock
-              mountPath: /var/run
+              mountPath: /run/docker-sock
             # dockerd's default /var/lib/docker sits on the pod's own
             # virtiofs-backed rootfs, and overlay2 can't mount on top of
             # virtiofs ("invalid argument"), so dockerd falls back to the
