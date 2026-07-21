@@ -43,10 +43,13 @@ spec:
           # Without an explicit memory limit, Kata sizes the guest VM off
           # its own small default (~2GB) instead of the host's real
           # capacity, and --capacity=32 sessions OOMKilled the container
-          # under that ceiling. 4Gi keeps it well clear.
+          # under that ceiling. Kata hotplugs guest memory per-container
+          # based on each container's own limit (they're additive, not
+          # shared), so this and dockerd's limit below both count toward
+          # the guest total.
           resources:
             requests:
-              memory: 4Gi
+              memory: 2Gi
             limits:
               memory: 4Gi
           volumeMounts:
@@ -56,6 +59,14 @@ spec:
               mountPath: /run/docker-sock
         - name: dockerd
           image: docker:27-dind
+          # dind image builds (e.g. compiling wheels for a python image) ran
+          # this out of memory with no limit set here, since without a
+          # per-container limit Kata never hotplugs guest memory for it.
+          resources:
+            requests:
+              memory: 2Gi
+            limits:
+              memory: 4Gi
           # Only docker.sock needs to be shared with the claude-code
           # container, so it gets its own subdirectory instead of all of
           # /var/run. Sharing the whole of /var/run would also share
