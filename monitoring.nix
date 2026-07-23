@@ -38,12 +38,7 @@
       repo = "https://victoriametrics.github.io/helm-charts";
       name = "victoria-metrics-single";
       version = "0.39.0";
-      hash = lib.fakeHash; # placeholder -- no working `nix` binary in this
-                           # dev container to precompute a real hash. Fill
-                           # in the real value from the `hash mismatch ...
-                           # got: sha256-...` error the first time
-                           # `nixos-rebuild` actually runs on the real host
-                           # (same workflow topolvm.nix's hash went through).
+      hash = "sha256-oZ9XYchH2lE9RavPHa2Ourk9kOrt40k0tuPrRHA0vZU=";
       targetNamespace = "monitoring";
       createNamespace = true;
       values = {
