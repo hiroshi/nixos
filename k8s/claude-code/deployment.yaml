@@ -62,11 +62,19 @@ spec:
           # dind image builds (e.g. compiling wheels for a python image) ran
           # this out of memory with no limit set here, since without a
           # per-container limit Kata never hotplugs guest memory for it.
+          #
+          # The docker-data tmpfs below counts against this same cgroup
+          # limit as dockerd/containerd/buildkit's own process memory, so
+          # the limit needs real headroom above the tmpfs sizeLimit — with
+          # both at 4Gi (the previous setting), a build that fills the
+          # tmpfs anywhere close to its cap leaves ~0 memory for the
+          # daemon itself, OOMKilling dockerd (confirmed via repeated
+          # `lastState: OOMKilled, exitCode: 137` on this container).
           resources:
             requests:
-              memory: 2Gi
-            limits:
               memory: 4Gi
+            limits:
+              memory: 8Gi
           # Only docker.sock needs to be shared with the claude-code
           # container, so it gets its own subdirectory instead of all of
           # /var/run. Sharing the whole of /var/run would also share
