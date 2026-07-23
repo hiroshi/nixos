@@ -28,6 +28,7 @@
               pkgs.docker-client
               pkgs.python3
               pkgs.gnumake
+              pkgs.gettext
             ];
           };
         });
