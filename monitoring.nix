@@ -5,16 +5,24 @@
 # #18, #19), already addressed once via a headroom bump, and this stack is
 # meant to give real data for the next tuning pass instead of guessing again.
 #
-# A single OpenTelemetry Collector DaemonSet handles both metrics (scraping
-# this node's kubelet /metrics/cadvisor via a `prometheus` receiver, chosen
-# over the `kubeletstats` receiver because cadvisor exposes
-# `container_memory_working_set_bytes{container="dockerd"}` verbatim instead
-# of going through an extra OTel-semantic-convention rename) and logs (via
-# the `filelog` receiver, reading /var/log/pods), exporting both natively as
-# OTLP into VictoriaMetrics and VictoriaLogs respectively -- one agent
-# process instead of a separate vmagent + Fluent Bit pair, since both would
-# need the same node-local DaemonSet access anyway and this is a
+# A single OpenTelemetry Collector DaemonSet handles both metrics (via the
+# `kubeletstats` receiver, polling this node's kubelet Summary API) and logs
+# (via the `filelog` receiver, reading /var/log/pods), exporting both
+# natively as OTLP into VictoriaMetrics and VictoriaLogs respectively -- one
+# agent process instead of a separate vmagent + Fluent Bit pair, since both
+# would need the same node-local DaemonSet access anyway and this is a
 # single-node cluster with no isolation benefit from splitting them.
+#
+# kubeletstats (Summary API), not a `prometheus` receiver scraping
+# /metrics/cadvisor directly: the dockerd sidecar's pod runs under
+# `runtimeClassName: kata` (see k8s/claude-code/deployment.yaml), and
+# Kata's per-container cgroups live inside the guest VM -- the host's
+# cadvisor only ever exposes a synthetic `kata_overhead` entry for the
+# whole sandbox, never a `container="dockerd"` series (confirmed
+# empirically: grepping a full /metrics/cadvisor dump for it comes up
+# empty). `kubectl top pod --containers` goes through the same Summary API
+# this receiver uses and correctly reports the dockerd container's memory,
+# so it's the only one of the two that actually works for this cluster.
 #
 # VictoriaMetrics/VictoriaLogs (not Prometheus/Loki) chosen for lower memory
 # footprint on a 16GB node with an OOM history -- both are single lean
@@ -25,8 +33,7 @@
 # if that changes later.
 #
 # All RBAC is left to each Helm chart's own bundled ServiceAccount/
-# ClusterRole/ClusterRoleBinding templates (only one extra rule is added via
-# values, for the OTel Collector's cadvisor scrape) rather than hand-written
+# ClusterRole/ClusterRoleBinding templates rather than hand-written
 # manifests, since this cluster's restrictive default RBAC has already
 # produced several subtle permission surprises this project.
 { config, lib, pkgs, ... }:
@@ -91,9 +98,9 @@
       targetNamespace = "monitoring";
       createNamespace = true;
       values = {
-        mode = "daemonset"; # both the prometheus (kubelet/cadvisor) and
-                             # filelog (/var/log/pods) receivers need
-                             # node-local access.
+        mode = "daemonset"; # both the kubeletstats and filelog
+                             # (/var/log/pods) receivers need node-local
+                             # access.
 
         # This chart version hard-requires image.repository to be set
         # explicitly (no more empty-string-falls-back-to-contrib default);
@@ -108,12 +115,12 @@
                                                 # pod/namespace/node
                                                 # enrichment for both
                                                 # metrics and logs
-          # kubeletMetrics preset deliberately NOT used here -- the
-          # prometheus receiver scraping /metrics/cadvisor directly
-          # preserves cadvisor's exact metric/label names, whereas
-          # kubeletstats derives from the kubelet Summary API and
-          # re-emits under renamed OTel semantic-convention names, an
-          # extra translation hop not worth it for this narrow goal.
+          kubeletMetrics.enabled = true; # wires up the kubeletstats
+                                          # receiver + its ClusterRole
+                                          # rule (nodes/stats) -- see the
+                                          # file header for why this is
+                                          # used over a prometheus/cadvisor
+                                          # receiver here.
         };
 
         # K8S_NODE_IP is not declared via extraEnvs here: the chart's
@@ -121,21 +128,8 @@
         # presets.kubernetesAttributes.enabled is true and mode is
         # "daemonset" (both true above), so an explicit extraEnvs entry
         # for the same key collides with it (duplicate env "K8S_NODE_IP").
-        # It's still consumed below by the prometheus receiver's
-        # kubelet-cadvisor scrape target.
-
-        clusterRole = {
-          create = true;
-          rules = [
-            # kubelet authorizes a direct (non-apiserver-proxied)
-            # /metrics/cadvisor scrape against this subresource.
-            {
-              apiGroups = [ "" ];
-              resources = [ "nodes/metrics" ];
-              verbs = [ "get" ];
-            }
-          ];
-        };
+        # It's the same env var the kubeletMetrics preset points its
+        # kubeletstats receiver's endpoint at, below.
 
         resources = {
           requests.memory = "256Mi";
@@ -144,19 +138,13 @@
 
         config = {
           receivers = {
-            prometheus.config.scrape_configs = [
-              {
-                job_name = "kubelet-cadvisor";
-                scheme = "https";
-                tls_config.insecure_skip_verify = true;
-                authorization = {
-                  type = "Bearer";
-                  credentials_file = "/var/run/secrets/kubernetes.io/serviceaccount/token";
-                };
-                metrics_path = "/metrics/cadvisor";
-                static_configs = [ { targets = [ "\${env:K8S_NODE_IP}:10250" ]; } ];
-              }
-            ];
+            # kubelet's serving cert isn't signed by a CA the collector
+            # trusts by default -- same reason the old prometheus
+            # receiver's tls_config.insecure_skip_verify was needed to
+            # actually connect. Merges with (rather than replaces) the
+            # kubeletMetrics preset's own receivers.kubeletstats config
+            # (collection_interval, auth_type, endpoint) above.
+            kubeletstats.insecure_skip_verify = true;
           };
 
           processors = {
@@ -178,8 +166,12 @@
             # filelog and k8sattributes come from the presets above, but
             # providing an explicit `service.pipelines` block overrides
             # rather than appends, so they're still named explicitly here.
+            # kubeletstats isn't listed in `receivers` below: the
+            # kubeletMetrics preset appends it into this same list
+            # automatically (see chart's _config.tpl), so listing it here
+            # too would just be a redundant duplicate.
             metrics = {
-              receivers = [ "prometheus" ];
+              receivers = [ ];
               processors = [ "k8sattributes" "memory_limiter" "batch" ];
               exporters = [ "otlphttp/vm" ];
             };
