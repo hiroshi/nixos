@@ -95,6 +95,12 @@
                              # filelog (/var/log/pods) receivers need
                              # node-local access.
 
+        # This chart version hard-requires image.repository to be set
+        # explicitly (no more empty-string-falls-back-to-contrib default);
+        # contrib is required here since filelog/prometheus/k8sattributes
+        # all live in the contrib distribution, not core.
+        image.repository = "otel/opentelemetry-collector-contrib";
+
         presets = {
           logsCollection.enabled = true;       # wires up the filelog
                                                 # receiver + hostPath mounts
