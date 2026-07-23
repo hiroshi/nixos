@@ -116,14 +116,13 @@
           # extra translation hop not worth it for this narrow goal.
         };
 
-        # Needed so the prometheus receiver can address its own node's
-        # kubelet.
-        extraEnvs = [
-          {
-            name = "K8S_NODE_IP";
-            valueFrom.fieldRef.fieldPath = "status.hostIP";
-          }
-        ];
+        # K8S_NODE_IP is not declared via extraEnvs here: the chart's
+        # _pod.tpl already injects it automatically whenever
+        # presets.kubernetesAttributes.enabled is true and mode is
+        # "daemonset" (both true above), so an explicit extraEnvs entry
+        # for the same key collides with it (duplicate env "K8S_NODE_IP").
+        # It's still consumed below by the prometheus receiver's
+        # kubelet-cadvisor scrape target.
 
         clusterRole = {
           create = true;
