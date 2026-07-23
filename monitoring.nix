@@ -92,7 +92,7 @@
       repo = "https://open-telemetry.github.io/opentelemetry-helm-charts";
       name = "opentelemetry-collector";
       version = "0.165.0";
-      hash = lib.fakeHash; # placeholder, see note above
+      hash = "sha256-tZLqBk2bkGkwysLSK4jusbyC8S1e0H/SB5LeLAUco8U=";
       targetNamespace = "monitoring";
       createNamespace = true;
       values = {
