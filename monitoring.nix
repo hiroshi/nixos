@@ -66,7 +66,7 @@
       repo = "https://victoriametrics.github.io/helm-charts";
       name = "victoria-logs-single";
       version = "0.13.9";
-      hash = lib.fakeHash; # placeholder, see note above
+      hash = "sha256-WTs/jg0m65JaDj1ZhI0XoKvJRZeALcJrqOCSVYQXaoY=";
       targetNamespace = "monitoring";
       createNamespace = true;
       values = {
