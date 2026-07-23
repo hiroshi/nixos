@@ -10,6 +10,7 @@
       ./hardware-configuration.nix
       ./topolvm.nix
       ./kata.nix
+      ./monitoring.nix
     ];
 
   # Use the systemd-boot EFI boot loader.
