@@ -144,7 +144,14 @@
             # actually connect. Merges with (rather than replaces) the
             # kubeletMetrics preset's own receivers.kubeletstats config
             # (collection_interval, auth_type, endpoint) above.
-            kubeletstats.insecure_skip_verify = true;
+            kubeletstats = {
+              insecure_skip_verify = true;
+              # The preset's default metric_groups is [container, pod,
+              # node] -- "volume" is opt-in and needed to get PVC
+              # capacity/usage (k8s.volume.capacity/available/inodes*)
+              # for the topolvm-provisioner PVCs used by this stack.
+              metric_groups = [ "container" "pod" "node" "volume" ];
+            };
           };
 
           processors = {
