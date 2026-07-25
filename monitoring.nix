@@ -277,6 +277,23 @@
           limits.memory = "256Mi";
         };
 
+        # The chart's default `securityContext.readOnlyRootFilesystem = true`
+        # otherwise breaks plugin loading entirely: per Perses's Dockerfile,
+        # `/etc/perses/plugins` is baked into the image as an *empty*
+        # directory, and the bundled plugin archives under
+        # `/etc/perses/plugins-archive` are only extracted into it at
+        # container *startup* (see
+        # https://perses.dev/perses/docs/configuration/load-plugin/) -- with
+        # no writable volume mounted there, that extraction silently fails
+        # and `/api/v1/plugins` comes back `[]` (confirmed live: no explore
+        # plugin available for any datasource, not just VictoriaLogs).
+        volumes = [
+          { name = "plugins"; emptyDir = { }; }
+        ];
+        volumeMounts = [
+          { name = "plugins"; mountPath = "/etc/perses/plugins"; }
+        ];
+
         # `config.security.authentication.enable_auth` is left at its chart
         # default (false, no login) -- the Tailscale Ingress below is this
         # dashboard's only access control, deliberately, rather than also
