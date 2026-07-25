@@ -365,7 +365,14 @@
             # yet verified against every panel type this cluster might use;
             # if a query fails with an endpoint-not-allowed error after
             # rollout, add the missing pattern here.
-            data."datasource.yaml" = builtins.toJSON {
+            #
+            # The sidecar names the file it writes into
+            # /etc/perses/provisioning after this data key, not after the
+            # ConfigMap's own name -- it must be unique across both
+            # ConfigMaps below, or the second write silently clobbers the
+            # first and only one datasource ever actually loads (confirmed
+            # live: both were writing to a shared "datasource.yaml").
+            data."victoriametrics-datasource.yaml" = builtins.toJSON {
               kind = "GlobalDatasource";
               metadata.name = "VictoriaMetrics";
               spec = {
@@ -406,7 +413,7 @@
             # `allowedEndpoints` below is the LogsQL query surface per
             # https://perses.dev/plugins/docs/victorialogs/model/ -- same
             # not-yet-verified caveat as the VictoriaMetrics datasource above.
-            data."datasource.yaml" = builtins.toJSON {
+            data."victorialogs-datasource.yaml" = builtins.toJSON {
               kind = "GlobalDatasource";
               metadata.name = "VictoriaLogs";
               spec = {
