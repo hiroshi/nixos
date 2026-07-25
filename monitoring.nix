@@ -350,7 +350,22 @@
       apiVersion = "networking.k8s.io/v1";
       kind = "Ingress";
       metadata = {
-        name = "perses";
+        # Named "perses-static", not "perses" -- this object (and the 4
+        # ConfigMaps below) used to be part of the `perses` Helm release's
+        # own `extraObjects` before the extraObjects/tpl bug above. Helm's
+        # upgrade-time cleanup deletes anything present in the *previous*
+        # release revision's manifest but absent from the new one, purely
+        # by GVK+namespace+name -- it doesn't know or care that a
+        # same-named object is now managed elsewhere, so it deleted this
+        # Ingress right out from under `services.k3s.manifests` the moment
+        # the `perses` Helm release upgraded away from having it in
+        # extraObjects (confirmed live: `kubectl get ingress -n monitoring`
+        # came back empty even though the k3s Addon controller's own log
+        # showed this manifest applying successfully moments earlier).
+        # Renaming sidesteps this permanently -- Helm's release history
+        # will never again contain anything named "perses-static", so
+        # there's nothing left for it to "clean up".
+        name = "perses-static";
         namespace = "monitoring";
       };
       spec = {
@@ -376,7 +391,7 @@
       apiVersion = "v1";
       kind = "ConfigMap";
       metadata = {
-        name = "perses-datasource-victoriametrics";
+        name = "perses-datasource-victoriametrics-static";
         namespace = "monitoring";
         labels."perses.dev/resource" = "true";
       };
@@ -426,7 +441,7 @@
       apiVersion = "v1";
       kind = "ConfigMap";
       metadata = {
-        name = "perses-datasource-victorialogs";
+        name = "perses-datasource-victorialogs-static";
         namespace = "monitoring";
         labels."perses.dev/resource" = "true";
       };
@@ -485,7 +500,7 @@
       apiVersion = "v1";
       kind = "ConfigMap";
       metadata = {
-        name = "perses-project-k3s";
+        name = "perses-project-k3s-static";
         namespace = "monitoring";
         labels."perses.dev/resource" = "true";
       };
@@ -500,7 +515,7 @@
       apiVersion = "v1";
       kind = "ConfigMap";
       metadata = {
-        name = "perses-dashboard-logs";
+        name = "perses-dashboard-logs-static";
         namespace = "monitoring";
         labels."perses.dev/resource" = "true";
       };
