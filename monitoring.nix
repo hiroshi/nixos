@@ -495,7 +495,13 @@
                   spec = {
                     display.name = "PV Usage %";
                     plugin.kind = "TimeSeriesChart";
-                    plugin.spec = { };
+                    # `legend.mode` has no default in this chart's bundled
+                    # TimeSeriesChart plugin (0.12.1) -- its CUE schema
+                    # rejects `null` outright ("conflicting values null and
+                    # \"list\""), confirmed live via the UI's own Save
+                    # erroring on this exact field for a panel that never
+                    # touched Legend settings at all. Must be set explicitly.
+                    plugin.spec.legend.mode = "list";
                     queries = [
                       {
                         kind = "TimeSeriesQuery";
