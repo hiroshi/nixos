@@ -444,6 +444,98 @@
               };
             };
           }
+
+          # Dashboards are provisioned as code the same way as the
+          # datasources above, rather than relying on the UI's own "Save"
+          # (which needs a Project to exist first -- there wasn't one, and
+          # this is more in keeping with the rest of this file anyway). Per
+          # https://perses.dev/helm-charts/docs/managing-resources-with-configmaps/,
+          # a Dashboard's Project must exist before the Dashboard itself is
+          # provisioned, and each ConfigMap should hold exactly one resource
+          # (1MB ConfigMap data limit) -- hence two separate ConfigMaps here,
+          # not one.
+          {
+            apiVersion = "v1";
+            kind = "ConfigMap";
+            metadata = {
+              name = "perses-project-monitoring";
+              namespace = "monitoring";
+              labels."perses.dev/resource" = "true";
+            };
+            data."project.json" = builtins.toJSON {
+              kind = "Project";
+              metadata.name = "monitoring";
+              spec.display.name = "monitoring";
+            };
+          }
+
+          {
+            apiVersion = "v1";
+            kind = "ConfigMap";
+            metadata = {
+              name = "perses-dashboard-pv-usage";
+              namespace = "monitoring";
+              labels."perses.dev/resource" = "true";
+            };
+            # PVC-only filter (k8s.volume.name is unique to real PVCs here --
+            # "home"/"storage"/"server-volume" -- unlike the noise volumes,
+            # see the volume-name survey in project memory); server-volume
+            # is shared by both VictoriaMetrics and VictoriaLogs pods, hence
+            # the pod name in seriesNameFormat to tell them apart.
+            data."dashboard.json" = builtins.toJSON {
+              kind = "Dashboard";
+              metadata = {
+                name = "pv-usage";
+                project = "monitoring";
+              };
+              spec = {
+                display.name = "PV Usage";
+                panels.pvUsagePercent = {
+                  kind = "Panel";
+                  spec = {
+                    display.name = "PV Usage %";
+                    plugin.kind = "TimeSeriesChart";
+                    plugin.spec = { };
+                    queries = [
+                      {
+                        kind = "TimeSeriesQuery";
+                        spec.plugin = {
+                          kind = "PrometheusTimeSeriesQuery";
+                          spec = {
+                            datasource = {
+                              kind = "PrometheusDatasource";
+                              name = "victoriametrics";
+                            };
+                            query = ''
+                              100 * (1 - (
+                                {__name__="k8s.volume.available", k8s.volume.name=~"home|storage|server-volume"}
+                                /
+                                {__name__="k8s.volume.capacity", k8s.volume.name=~"home|storage|server-volume"}
+                              ))'';
+                            seriesNameFormat = "{{k8s.pod.name}}: {{k8s.volume.name}}";
+                          };
+                        };
+                      }
+                    ];
+                  };
+                };
+                layouts = [
+                  {
+                    kind = "Grid";
+                    spec.items = [
+                      {
+                        x = 0;
+                        y = 0;
+                        width = 12;
+                        height = 6;
+                        content."$ref" = "#/spec/panels/pvUsagePercent";
+                      }
+                    ];
+                  }
+                ];
+              };
+            };
+          }
         ];
       };
     };
