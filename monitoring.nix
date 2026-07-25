@@ -411,8 +411,14 @@
               labels."perses.dev/resource" = "true";
             };
             # `allowedEndpoints` below is the LogsQL query surface per
-            # https://perses.dev/plugins/docs/victorialogs/model/ -- same
-            # not-yet-verified caveat as the VictoriaMetrics datasource above.
+            # https://perses.dev/plugins/docs/victorialogs/model/. Both GET
+            # and POST are allowed for each path -- confirmed live that the
+            # Log Query plugin actually calls /select/logsql/query via POST
+            # (GET-only, per the docs example, was rejected with "forbidden
+            # access: ... not allowed to use this endpoint ... with the HTTP
+            # method POST"); the other two paths aren't yet confirmed to need
+            # POST too, but allowed defensively rather than debugging them
+            # one at a time.
             data."victorialogs-datasource.yaml" = builtins.toJSON {
               kind = "GlobalDatasource";
               metadata.name = "VictoriaLogs";
@@ -426,8 +432,11 @@
                       url = "http://victoria-logs-single-server.monitoring.svc.cluster.local:9428";
                       allowedEndpoints = [
                         { endpointPattern = "/select/logsql/query"; method = "GET"; }
+                        { endpointPattern = "/select/logsql/query"; method = "POST"; }
                         { endpointPattern = "/select/logsql/field_names"; method = "GET"; }
+                        { endpointPattern = "/select/logsql/field_names"; method = "POST"; }
                         { endpointPattern = "/select/logsql/field_values"; method = "GET"; }
+                        { endpointPattern = "/select/logsql/field_values"; method = "POST"; }
                       ];
                     };
                   };
