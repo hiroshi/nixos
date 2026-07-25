@@ -318,357 +318,377 @@
           };
         };
 
-        # Exposed via the Tailscale Ingress in extraObjects below instead --
-        # the tailscale-operator's expected shape (defaultBackend + tls.hosts
-        # for the MagicDNS name) doesn't match what this chart's own
-        # `ingress:` block generates (host-based `rules`), same reasoning as
-        # the datasource ConfigMaps below being hand-written too.
+        # Exposed via the Tailscale Ingress provisioned through
+        # `services.k3s.manifests` below instead -- the tailscale-operator's
+        # expected shape (defaultBackend + tls.hosts for the MagicDNS name)
+        # doesn't match what this chart's own `ingress:` block generates
+        # (host-based `rules`), same reasoning as the datasource/dashboard
+        # ConfigMaps down there being hand-written too.
         ingress.enabled = false;
-
-        extraObjects = [
-          {
-            apiVersion = "networking.k8s.io/v1";
-            kind = "Ingress";
-            metadata = {
-              name = "perses";
-              namespace = "monitoring";
-            };
-            spec = {
-              ingressClassName = "tailscale";
-              defaultBackend.service = {
-                name = "perses"; # chart's fullname helper collapses to just
-                                 # the release name ("perses") since the
-                                 # release name already contains the chart
-                                 # name -- see helpers/_identity.tpl.
-                port.number = 8080;
-              };
-              # Sets the MagicDNS name: https://perses.<tailnet>.ts.net
-              tls = [ { hosts = [ "perses" ]; } ];
-            };
-          }
-
-          # VictoriaMetrics implements the Prometheus HTTP API natively, so
-          # the built-in `PrometheusDatasource` plugin works directly -- no
-          # VictoriaMetrics-specific plugin needed. Server-side `proxy`
-          # (not `directUrl`) is required: the VM Service is only reachable
-          # from inside the cluster, not from a tailnet browser.
-          {
-            apiVersion = "v1";
-            kind = "ConfigMap";
-            metadata = {
-              name = "perses-datasource-victoriametrics";
-              namespace = "monitoring";
-              labels."perses.dev/resource" = "true";
-            };
-            # `allowedEndpoints` below is the standard Prometheus API surface
-            # per https://perses.dev/plugins/docs/prometheus/model/ -- not
-            # yet verified against every panel type this cluster might use;
-            # if a query fails with an endpoint-not-allowed error after
-            # rollout, add the missing pattern here.
-            #
-            # The sidecar names the file it writes into
-            # /etc/perses/provisioning after this data key, not after the
-            # ConfigMap's own name -- it must be unique across both
-            # ConfigMaps below, or the second write silently clobbers the
-            # first and only one datasource ever actually loads (confirmed
-            # live: both were writing to a shared "datasource.yaml").
-            data."victoriametrics-datasource.yaml" = builtins.toJSON {
-              kind = "GlobalDatasource";
-              metadata.name = "VictoriaMetrics";
-              spec = {
-                default = true;
-                plugin = {
-                  kind = "PrometheusDatasource";
-                  spec.proxy = {
-                    kind = "HTTPProxy";
-                    spec = {
-                      url = "http://victoria-metrics-single-server.monitoring.svc.cluster.local:8428";
-                      allowedEndpoints = [
-                        { endpointPattern = "/api/v1/labels"; method = "POST"; }
-                        { endpointPattern = "/api/v1/series"; method = "POST"; }
-                        { endpointPattern = "/api/v1/metadata"; method = "GET"; }
-                        { endpointPattern = "/api/v1/query"; method = "POST"; }
-                        { endpointPattern = "/api/v1/query_range"; method = "POST"; }
-                        { endpointPattern = "/api/v1/label/([a-zA-Z0-9_-]+)/values"; method = "GET"; }
-                      ];
-                    };
-                  };
-                };
-              };
-            };
-          }
-
-          # VictoriaLogs isn't Loki-API-compatible for querying, so it needs
-          # its own official plugin (this is the thing Grafana doesn't have
-          # a first-class equivalent of -- see file header). Same
-          # server-side `proxy` reasoning as VictoriaMetrics above.
-          {
-            apiVersion = "v1";
-            kind = "ConfigMap";
-            metadata = {
-              name = "perses-datasource-victorialogs";
-              namespace = "monitoring";
-              labels."perses.dev/resource" = "true";
-            };
-            # `allowedEndpoints` below is the LogsQL query surface per
-            # https://perses.dev/plugins/docs/victorialogs/model/. Both GET
-            # and POST are allowed for each path -- confirmed live that the
-            # Log Query plugin actually calls /select/logsql/query via POST
-            # (GET-only, per the docs example, was rejected with "forbidden
-            # access: ... not allowed to use this endpoint ... with the HTTP
-            # method POST"); the other two paths aren't yet confirmed to need
-            # POST too, but allowed defensively rather than debugging them
-            # one at a time.
-            data."victorialogs-datasource.yaml" = builtins.toJSON {
-              kind = "GlobalDatasource";
-              metadata.name = "VictoriaLogs";
-              spec = {
-                default = false;
-                plugin = {
-                  kind = "VictoriaLogsDatasource";
-                  spec.proxy = {
-                    kind = "HTTPProxy";
-                    spec = {
-                      url = "http://victoria-logs-single-server.monitoring.svc.cluster.local:9428";
-                      allowedEndpoints = [
-                        { endpointPattern = "/select/logsql/query"; method = "GET"; }
-                        { endpointPattern = "/select/logsql/query"; method = "POST"; }
-                        { endpointPattern = "/select/logsql/field_names"; method = "GET"; }
-                        { endpointPattern = "/select/logsql/field_names"; method = "POST"; }
-                        { endpointPattern = "/select/logsql/field_values"; method = "GET"; }
-                        { endpointPattern = "/select/logsql/field_values"; method = "POST"; }
-                      ];
-                    };
-                  };
-                };
-              };
-            };
-          }
-
-          # Dashboards are provisioned as code the same way as the
-          # datasources above, rather than relying on the UI's own "Save"
-          # (which needs a Project to exist first, and this is more in
-          # keeping with the rest of this file anyway). Per
-          # https://perses.dev/helm-charts/docs/managing-resources-with-configmaps/,
-          # a Dashboard's Project must exist before the Dashboard itself is
-          # provisioned, and each ConfigMap should hold exactly one resource
-          # (1MB ConfigMap data limit) -- hence two separate ConfigMaps here,
-          # not one.
-          #
-          # Project name "k3s" matches the one already created by hand via
-          # the Perses UI before this was provisioned as code, rather than
-          # introducing a second, redundant project.
-          {
-            apiVersion = "v1";
-            kind = "ConfigMap";
-            metadata = {
-              name = "perses-project-k3s";
-              namespace = "monitoring";
-              labels."perses.dev/resource" = "true";
-            };
-            data."project.json" = builtins.toJSON {
-              kind = "Project";
-              metadata.name = "k3s";
-              spec.display.name = "k3s";
-            };
-          }
-
-          {
-            apiVersion = "v1";
-            kind = "ConfigMap";
-            metadata = {
-              name = "perses-dashboard-logs";
-              namespace = "monitoring";
-              labels."perses.dev/resource" = "true";
-            };
-            # This is a direct transcription of a dashboard actually built
-            # and JSON-exported from the Perses UI (three panels: raw logs,
-            # PVC usage %, PVC usage bytes), not a hand-guessed one -- the
-            # only change from the export is `legend.mode`: the UI's own
-            # export had it as `null` on both TimeSeriesChart panels, which
-            # the chart's bundled TimeSeriesChart plugin (0.12.1) rejects
-            # outright ("conflicting values null and \"list\""/"\"table\""),
-            # confirmed live via the UI's own Save erroring on exactly this
-            # field even with "List" apparently selected on screen -- set to
-            # "list" explicitly here instead.
-            #
-            # PVC-only filter (k8s.volume.name is unique to real PVCs here --
-            # "home"/"storage"/"server-volume" -- unlike the many noise
-            # volumes, see the volume-name survey in project memory);
-            # server-volume is shared by both VictoriaMetrics and
-            # VictoriaLogs pods, hence the pod name in seriesNameFormat to
-            # tell them apart.
-            data."dashboard.json" = builtins.toJSON {
-              kind = "Dashboard";
-              metadata = {
-                name = "logs";
-                project = "k3s";
-                version = 0;
-                tags = [ ];
-              };
-              spec = {
-                display.name = "logs";
-                panels = {
-                  "e8155cd770c6422ebc6a1eeaf38e7fc6" = {
-                    kind = "Panel";
-                    spec = {
-                      display.name = "";
-                      plugin = {
-                        kind = "LogsTable";
-                        spec = {
-                          showTime = true;
-                          allowWrap = true;
-                          enableDetails = true;
-                        };
-                      };
-                      queries = [
-                        {
-                          kind = "LogQuery";
-                          spec.plugin = {
-                            kind = "VictoriaLogsLogQuery";
-                            spec = {
-                              query = "*";
-                              datasource = {
-                                kind = "VictoriaLogsDatasource";
-                                name = "victorialogs";
-                              };
-                            };
-                          };
-                        }
-                      ];
-                    };
-                  };
-
-                  "bbaa26b433aa401891e689b5e6007f67" = {
-                    kind = "Panel";
-                    spec = {
-                      display.name = "PVC %";
-                      plugin = {
-                        kind = "TimeSeriesChart";
-                        spec = {
-                          yAxis = {
-                            show = true;
-                            label = "";
-                            format.unit = "percent";
-                          };
-                          legend = {
-                            position = "bottom";
-                            mode = "list";
-                          };
-                        };
-                      };
-                      queries = [
-                        {
-                          kind = "TimeSeriesQuery";
-                          spec.plugin = {
-                            kind = "PrometheusTimeSeriesQuery";
-                            spec = {
-                              query = ''
-                                100 * (1 - (
-                                  {__name__="k8s.volume.available", k8s.volume.name=~"home|storage|server-volume"}
-                                  /
-                                  {__name__="k8s.volume.capacity", k8s.volume.name=~"home|storage|server-volume"}
-                                ))'';
-                              seriesNameFormat = "{{k8s.pod.name}}: {{k8s.volume.name}}";
-                            };
-                          };
-                        }
-                      ];
-                    };
-                  };
-
-                  "d1850588f54947dea396d8089348a780" = {
-                    kind = "Panel";
-                    spec = {
-                      display.name = "PVC usage";
-                      plugin = {
-                        kind = "TimeSeriesChart";
-                        spec = {
-                          yAxis = {
-                            show = true;
-                            label = "usage";
-                            format.unit = "decbytes";
-                          };
-                          legend = {
-                            position = "bottom";
-                            mode = "list";
-                          };
-                        };
-                      };
-                      queries = [
-                        {
-                          kind = "TimeSeriesQuery";
-                          spec.plugin = {
-                            kind = "PrometheusTimeSeriesQuery";
-                            spec = {
-                              query = ''
-                                {__name__="k8s.volume.capacity", k8s.volume.name=~"home|storage|server-volume"}
-                                - {__name__="k8s.volume.available", k8s.volume.name=~"home|storage|server-volume"}'';
-                              seriesNameFormat = "{{k8s.pod.name}}: {{k8s.volume.name}}";
-                            };
-                          };
-                        }
-                      ];
-                    };
-                  };
-                };
-
-                layouts = [
-                  {
-                    kind = "Grid";
-                    spec = {
-                      display = {
-                        title = "Log";
-                        collapse.open = true;
-                      };
-                      items = [
-                        {
-                          x = 0;
-                          y = 0;
-                          width = 24;
-                          height = 6;
-                          content."$ref" = "#/spec/panels/e8155cd770c6422ebc6a1eeaf38e7fc6";
-                        }
-                      ];
-                      repeatVariable = "";
-                    };
-                  }
-                  {
-                    kind = "Grid";
-                    spec = {
-                      display = {
-                        title = "PVC";
-                        collapse.open = true;
-                      };
-                      items = [
-                        {
-                          x = 0;
-                          y = 0;
-                          width = 12;
-                          height = 6;
-                          content."$ref" = "#/spec/panels/bbaa26b433aa401891e689b5e6007f67";
-                        }
-                        {
-                          x = 12;
-                          y = 0;
-                          width = 12;
-                          height = 6;
-                          content."$ref" = "#/spec/panels/d1850588f54947dea396d8089348a780";
-                        }
-                      ];
-                      repeatVariable = "";
-                    };
-                  }
-                ];
-
-                variables = [ ];
-                duration = "1h";
-                refreshInterval = "0s";
-              };
-            };
-          }
-        ];
       };
     };
   };
+
+  # The Ingress + all Perses-provisioning ConfigMaps (datasources, Project,
+  # Dashboard) live here rather than in the `perses` chart's own
+  # `extraObjects` -- that field is rendered through `{{ tpl (toYaml .) $ }}`
+  # (see the chart's templates/extra-manifests.yaml), meaning Helm
+  # re-parses the *entire* manifest as a Go template a second time. Any
+  # literal `{{ ... }}` inside our content -- e.g. Perses's own
+  # `seriesNameFormat` legend templating, `{{k8s.pod.name}}` -- gets
+  # misread as a Helm template action instead of surviving as plain text,
+  # and breaks the whole Helm upgrade with `function "k8s" not defined`
+  # (confirmed live: this silently failed every `helm-install-perses` job
+  # from the moment the Dashboard ConfigMap below was first added, while
+  # the previously-installed Helm revision kept running unaffected --
+  # caught only because the failing Job's own pod logs were checked).
+  # `services.k3s.manifests` has no such re-templating step (a plain
+  # Nix-to-YAML/JSON dump via `manifestFormat.generate`), so this whole
+  # class of bug can't recur here.
+  services.k3s.manifests.perses-extra.content = [
+    {
+      apiVersion = "networking.k8s.io/v1";
+      kind = "Ingress";
+      metadata = {
+        name = "perses";
+        namespace = "monitoring";
+      };
+      spec = {
+        ingressClassName = "tailscale";
+        defaultBackend.service = {
+          name = "perses"; # chart's fullname helper collapses to just
+                           # the release name ("perses") since the
+                           # release name already contains the chart
+                           # name -- see helpers/_identity.tpl.
+          port.number = 8080;
+        };
+        # Sets the MagicDNS name: https://perses.<tailnet>.ts.net
+        tls = [ { hosts = [ "perses" ]; } ];
+      };
+    }
+
+    # VictoriaMetrics implements the Prometheus HTTP API natively, so
+    # the built-in `PrometheusDatasource` plugin works directly -- no
+    # VictoriaMetrics-specific plugin needed. Server-side `proxy`
+    # (not `directUrl`) is required: the VM Service is only reachable
+    # from inside the cluster, not from a tailnet browser.
+    {
+      apiVersion = "v1";
+      kind = "ConfigMap";
+      metadata = {
+        name = "perses-datasource-victoriametrics";
+        namespace = "monitoring";
+        labels."perses.dev/resource" = "true";
+      };
+      # `allowedEndpoints` below is the standard Prometheus API surface
+      # per https://perses.dev/plugins/docs/prometheus/model/ -- not
+      # yet verified against every panel type this cluster might use;
+      # if a query fails with an endpoint-not-allowed error after
+      # rollout, add the missing pattern here.
+      #
+      # The sidecar names the file it writes into
+      # /etc/perses/provisioning after this data key, not after the
+      # ConfigMap's own name -- it must be unique across both
+      # ConfigMaps below, or the second write silently clobbers the
+      # first and only one datasource ever actually loads (confirmed
+      # live: both were writing to a shared "datasource.yaml").
+      data."victoriametrics-datasource.yaml" = builtins.toJSON {
+        kind = "GlobalDatasource";
+        metadata.name = "VictoriaMetrics";
+        spec = {
+          default = true;
+          plugin = {
+            kind = "PrometheusDatasource";
+            spec.proxy = {
+              kind = "HTTPProxy";
+              spec = {
+                url = "http://victoria-metrics-single-server.monitoring.svc.cluster.local:8428";
+                allowedEndpoints = [
+                  { endpointPattern = "/api/v1/labels"; method = "POST"; }
+                  { endpointPattern = "/api/v1/series"; method = "POST"; }
+                  { endpointPattern = "/api/v1/metadata"; method = "GET"; }
+                  { endpointPattern = "/api/v1/query"; method = "POST"; }
+                  { endpointPattern = "/api/v1/query_range"; method = "POST"; }
+                  { endpointPattern = "/api/v1/label/([a-zA-Z0-9_-]+)/values"; method = "GET"; }
+                ];
+              };
+            };
+          };
+        };
+      };
+    }
+
+    # VictoriaLogs isn't Loki-API-compatible for querying, so it needs
+    # its own official plugin (this is the thing Grafana doesn't have
+    # a first-class equivalent of -- see file header). Same
+    # server-side `proxy` reasoning as VictoriaMetrics above.
+    {
+      apiVersion = "v1";
+      kind = "ConfigMap";
+      metadata = {
+        name = "perses-datasource-victorialogs";
+        namespace = "monitoring";
+        labels."perses.dev/resource" = "true";
+      };
+      # `allowedEndpoints` below is the LogsQL query surface per
+      # https://perses.dev/plugins/docs/victorialogs/model/. Both GET
+      # and POST are allowed for each path -- confirmed live that the
+      # Log Query plugin actually calls /select/logsql/query via POST
+      # (GET-only, per the docs example, was rejected with "forbidden
+      # access: ... not allowed to use this endpoint ... with the HTTP
+      # method POST"); the other two paths aren't yet confirmed to need
+      # POST too, but allowed defensively rather than debugging them
+      # one at a time.
+      data."victorialogs-datasource.yaml" = builtins.toJSON {
+        kind = "GlobalDatasource";
+        metadata.name = "VictoriaLogs";
+        spec = {
+          default = false;
+          plugin = {
+            kind = "VictoriaLogsDatasource";
+            spec.proxy = {
+              kind = "HTTPProxy";
+              spec = {
+                url = "http://victoria-logs-single-server.monitoring.svc.cluster.local:9428";
+                allowedEndpoints = [
+                  { endpointPattern = "/select/logsql/query"; method = "GET"; }
+                  { endpointPattern = "/select/logsql/query"; method = "POST"; }
+                  { endpointPattern = "/select/logsql/field_names"; method = "GET"; }
+                  { endpointPattern = "/select/logsql/field_names"; method = "POST"; }
+                  { endpointPattern = "/select/logsql/field_values"; method = "GET"; }
+                  { endpointPattern = "/select/logsql/field_values"; method = "POST"; }
+                ];
+              };
+            };
+          };
+        };
+      };
+    }
+
+    # Dashboards are provisioned as code the same way as the
+    # datasources above, rather than relying on the UI's own "Save"
+    # (which needs a Project to exist first, and this is more in
+    # keeping with the rest of this file anyway -- also, `perses`'s
+    # `persistence.enabled = false` means anything saved only via the
+    # UI is one pod restart away from being wiped for good, confirmed
+    # live). Per
+    # https://perses.dev/helm-charts/docs/managing-resources-with-configmaps/,
+    # a Dashboard's Project must exist before the Dashboard itself is
+    # provisioned, and each ConfigMap should hold exactly one resource
+    # (1MB ConfigMap data limit) -- hence separate ConfigMaps here, not
+    # one.
+    #
+    # Project name "k3s" matches the one already created by hand via
+    # the Perses UI before this was provisioned as code, rather than
+    # introducing a second, redundant project.
+    {
+      apiVersion = "v1";
+      kind = "ConfigMap";
+      metadata = {
+        name = "perses-project-k3s";
+        namespace = "monitoring";
+        labels."perses.dev/resource" = "true";
+      };
+      data."project.json" = builtins.toJSON {
+        kind = "Project";
+        metadata.name = "k3s";
+        spec.display.name = "k3s";
+      };
+    }
+
+    {
+      apiVersion = "v1";
+      kind = "ConfigMap";
+      metadata = {
+        name = "perses-dashboard-logs";
+        namespace = "monitoring";
+        labels."perses.dev/resource" = "true";
+      };
+      # This is a direct transcription of a dashboard actually built
+      # and JSON-exported from the Perses UI (three panels: raw logs,
+      # PVC usage %, PVC usage bytes), not a hand-guessed one -- the
+      # only change from the export is `legend.mode`: the UI's own
+      # export had it as `null` on both TimeSeriesChart panels, which
+      # the chart's bundled TimeSeriesChart plugin (0.12.1) rejects
+      # outright ("conflicting values null and \"list\""/"\"table\""),
+      # confirmed live via the UI's own Save erroring on exactly this
+      # field even with "List" apparently selected on screen -- set to
+      # "list" explicitly here instead.
+      #
+      # PVC-only filter (k8s.volume.name is unique to real PVCs here --
+      # "home"/"storage"/"server-volume" -- unlike the many noise
+      # volumes, see the volume-name survey in project memory);
+      # server-volume is shared by both VictoriaMetrics and
+      # VictoriaLogs pods, hence the pod name in seriesNameFormat to
+      # tell them apart.
+      data."dashboard.json" = builtins.toJSON {
+        kind = "Dashboard";
+        metadata = {
+          name = "logs";
+          project = "k3s";
+          version = 0;
+          tags = [ ];
+        };
+        spec = {
+          display.name = "logs";
+          panels = {
+            "e8155cd770c6422ebc6a1eeaf38e7fc6" = {
+              kind = "Panel";
+              spec = {
+                display.name = "";
+                plugin = {
+                  kind = "LogsTable";
+                  spec = {
+                    showTime = true;
+                    allowWrap = true;
+                    enableDetails = true;
+                  };
+                };
+                queries = [
+                  {
+                    kind = "LogQuery";
+                    spec.plugin = {
+                      kind = "VictoriaLogsLogQuery";
+                      spec = {
+                        query = "*";
+                        datasource = {
+                          kind = "VictoriaLogsDatasource";
+                          name = "victorialogs";
+                        };
+                      };
+                    };
+                  }
+                ];
+              };
+            };
+
+            "bbaa26b433aa401891e689b5e6007f67" = {
+              kind = "Panel";
+              spec = {
+                display.name = "PVC %";
+                plugin = {
+                  kind = "TimeSeriesChart";
+                  spec = {
+                    yAxis = {
+                      show = true;
+                      label = "";
+                      format.unit = "percent";
+                    };
+                    legend = {
+                      position = "bottom";
+                      mode = "list";
+                    };
+                  };
+                };
+                queries = [
+                  {
+                    kind = "TimeSeriesQuery";
+                    spec.plugin = {
+                      kind = "PrometheusTimeSeriesQuery";
+                      spec = {
+                        query = ''
+                          100 * (1 - (
+                            {__name__="k8s.volume.available", k8s.volume.name=~"home|storage|server-volume"}
+                            /
+                            {__name__="k8s.volume.capacity", k8s.volume.name=~"home|storage|server-volume"}
+                          ))'';
+                        seriesNameFormat = "{{k8s.pod.name}}: {{k8s.volume.name}}";
+                      };
+                    };
+                  }
+                ];
+              };
+            };
+
+            "d1850588f54947dea396d8089348a780" = {
+              kind = "Panel";
+              spec = {
+                display.name = "PVC usage";
+                plugin = {
+                  kind = "TimeSeriesChart";
+                  spec = {
+                    yAxis = {
+                      show = true;
+                      label = "usage";
+                      format.unit = "decbytes";
+                    };
+                    legend = {
+                      position = "bottom";
+                      mode = "list";
+                    };
+                  };
+                };
+                queries = [
+                  {
+                    kind = "TimeSeriesQuery";
+                    spec.plugin = {
+                      kind = "PrometheusTimeSeriesQuery";
+                      spec = {
+                        query = ''
+                          {__name__="k8s.volume.capacity", k8s.volume.name=~"home|storage|server-volume"}
+                          - {__name__="k8s.volume.available", k8s.volume.name=~"home|storage|server-volume"}'';
+                        seriesNameFormat = "{{k8s.pod.name}}: {{k8s.volume.name}}";
+                      };
+                    };
+                  }
+                ];
+              };
+            };
+          };
+
+          layouts = [
+            {
+              kind = "Grid";
+              spec = {
+                display = {
+                  title = "Log";
+                  collapse.open = true;
+                };
+                items = [
+                  {
+                    x = 0;
+                    y = 0;
+                    width = 24;
+                    height = 6;
+                    content."$ref" = "#/spec/panels/e8155cd770c6422ebc6a1eeaf38e7fc6";
+                  }
+                ];
+                repeatVariable = "";
+              };
+            }
+            {
+              kind = "Grid";
+              spec = {
+                display = {
+                  title = "PVC";
+                  collapse.open = true;
+                };
+                items = [
+                  {
+                    x = 0;
+                    y = 0;
+                    width = 12;
+                    height = 6;
+                    content."$ref" = "#/spec/panels/bbaa26b433aa401891e689b5e6007f67";
+                  }
+                  {
+                    x = 12;
+                    y = 0;
+                    width = 12;
+                    height = 6;
+                    content."$ref" = "#/spec/panels/d1850588f54947dea396d8089348a780";
+                  }
+                ];
+                repeatVariable = "";
+              };
+            }
+          ];
+
+          variables = [ ];
+          duration = "1h";
+          refreshInterval = "0s";
+        };
+      };
+    }
+  ];
 }
