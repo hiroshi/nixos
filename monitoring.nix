@@ -170,6 +170,12 @@
               # capacity/usage (k8s.volume.capacity/available/inodes*)
               # for the topolvm-provisioner PVCs used by this stack.
               metric_groups = [ "container" "pod" "node" "volume" ];
+              # k8s.container.memory_limit_utilization is opt-in (disabled
+              # by default) -- needed for the memory-%-of-limit panel,
+              # same reasoning as the "volume" group above for PVC %.
+              metrics = {
+                "k8s.container.memory_limit_utilization".enabled = true;
+              };
             };
           };
 
