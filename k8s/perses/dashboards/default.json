@@ -1,16 +1,103 @@
 {
   "kind": "Dashboard",
   "metadata": {
-    "name": "default",
     "createdAt": "2026-07-26T05:40:43.336500064Z",
+    "name": "default",
+    "project": "k3s",
     "updatedAt": "2026-07-26T08:03:46.621734456Z",
-    "version": 7,
-    "project": "k3s"
+    "version": 7
   },
   "spec": {
     "display": {
       "name": "default"
     },
+    "duration": "1h",
+    "layouts": [
+      {
+        "kind": "Grid",
+        "spec": {
+          "display": {
+            "collapse": {
+              "open": true
+            },
+            "title": "Log"
+          },
+          "items": [
+            {
+              "content": {
+                "$ref": "#/spec/panels/e8155cd770c6422ebc6a1eeaf38e7fc6"
+              },
+              "height": 6,
+              "width": 24,
+              "x": 0,
+              "y": 0
+            }
+          ]
+        }
+      },
+      {
+        "kind": "Grid",
+        "spec": {
+          "display": {
+            "collapse": {
+              "open": true
+            },
+            "title": "PVC"
+          },
+          "items": [
+            {
+              "content": {
+                "$ref": "#/spec/panels/bbaa26b433aa401891e689b5e6007f67"
+              },
+              "height": 6,
+              "width": 12,
+              "x": 0,
+              "y": 0
+            },
+            {
+              "content": {
+                "$ref": "#/spec/panels/d1850588f54947dea396d8089348a780"
+              },
+              "height": 6,
+              "width": 12,
+              "x": 12,
+              "y": 0
+            }
+          ]
+        }
+      },
+      {
+        "kind": "Grid",
+        "spec": {
+          "display": {
+            "collapse": {
+              "open": true
+            },
+            "title": "Memory"
+          },
+          "items": [
+            {
+              "content": {
+                "$ref": "#/spec/panels/8767b5cdec4747e9b76f30236c98c23f"
+              },
+              "height": 6,
+              "width": 12,
+              "x": 0,
+              "y": 0
+            },
+            {
+              "content": {
+                "$ref": "#/spec/panels/a233da967ff241408162e8f75881c829"
+              },
+              "height": 6,
+              "width": 12,
+              "x": 12,
+              "y": 0
+            }
+          ]
+        }
+      }
+    ],
     "panels": {
       "8767b5cdec4747e9b76f30236c98c23f": {
         "kind": "Panel",
@@ -214,93 +301,6 @@
         }
       }
     },
-    "layouts": [
-      {
-        "kind": "Grid",
-        "spec": {
-          "display": {
-            "title": "Log",
-            "collapse": {
-              "open": true
-            }
-          },
-          "items": [
-            {
-              "x": 0,
-              "y": 0,
-              "width": 24,
-              "height": 6,
-              "content": {
-                "$ref": "#/spec/panels/e8155cd770c6422ebc6a1eeaf38e7fc6"
-              }
-            }
-          ]
-        }
-      },
-      {
-        "kind": "Grid",
-        "spec": {
-          "display": {
-            "title": "PVC",
-            "collapse": {
-              "open": true
-            }
-          },
-          "items": [
-            {
-              "x": 0,
-              "y": 0,
-              "width": 12,
-              "height": 6,
-              "content": {
-                "$ref": "#/spec/panels/bbaa26b433aa401891e689b5e6007f67"
-              }
-            },
-            {
-              "x": 12,
-              "y": 0,
-              "width": 12,
-              "height": 6,
-              "content": {
-                "$ref": "#/spec/panels/d1850588f54947dea396d8089348a780"
-              }
-            }
-          ]
-        }
-      },
-      {
-        "kind": "Grid",
-        "spec": {
-          "display": {
-            "title": "Memory",
-            "collapse": {
-              "open": true
-            }
-          },
-          "items": [
-            {
-              "x": 0,
-              "y": 0,
-              "width": 12,
-              "height": 6,
-              "content": {
-                "$ref": "#/spec/panels/8767b5cdec4747e9b76f30236c98c23f"
-              }
-            },
-            {
-              "x": 12,
-              "y": 0,
-              "width": 12,
-              "height": 6,
-              "content": {
-                "$ref": "#/spec/panels/a233da967ff241408162e8f75881c829"
-              }
-            }
-          ]
-        }
-      }
-    ],
-    "duration": "1h",
     "refreshInterval": "0s"
   }
 }

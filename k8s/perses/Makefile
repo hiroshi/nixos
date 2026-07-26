@@ -3,7 +3,7 @@ DASHBOARDS_DEFAULT_URL := https://perses.tail3aefc0.ts.net/api/v1/projects/k3s/d
 
 .PHONY: dashboards/default.json
 dashboards/default.json:
-	curl -vf $(DASHBOARDS_DEFAULT_URL) | jq > $@
+	curl -vf $(DASHBOARDS_DEFAULT_URL) | jq -S > $@
 
 .PHONY: dashboards-put
 dashboards-put:
