@@ -29,6 +29,7 @@
               pkgs.python3
               pkgs.gnumake
               pkgs.gettext
+              pkgs.jq
             ];
           };
         });
