@@ -6,5 +6,5 @@ dashboards/default.json:
 	curl -vf $(DASHBOARDS_DEFAULT_URL) | jq > $@
 
 .PHONY: dashboards-put
-dashboards-put: dashboards/default.json
-	curl -vf -T- -H "Content-Type: application/json" $(DASHBOARDS_DEFAULT_URL) < $<
+dashboards-put:
+	curl -vf -T- -H "Content-Type: application/json" $(DASHBOARDS_DEFAULT_URL) < dashboards/default.json
