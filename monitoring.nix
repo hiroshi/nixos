@@ -142,6 +142,24 @@
                                           # receiver here.
         };
 
+        # The kubeletMetrics preset's ClusterRole only grants nodes/stats
+        # (for the /stats/summary endpoint the always-on metric groups
+        # use). k8s.container.memory_limit_utilization (enabled below)
+        # additionally needs the receiver to hit kubelet's /pods endpoint
+        # to read each container's declared memory limit -- that's proxied
+        # through nodes/proxy, a separate RBAC resource. Without this rule
+        # the /pods call 403s every scrape cycle and the receiver aborts
+        # the *entire* scrape, silently dropping all metric groups
+        # (container/pod/node/volume alike), not just the new one --
+        # confirmed live via the collector's own error log.
+        clusterRole.rules = [
+          {
+            apiGroups = [ "" ];
+            resources = [ "nodes/proxy" ];
+            verbs = [ "get" ];
+          }
+        ];
+
         # K8S_NODE_IP is not declared via extraEnvs here: the chart's
         # _pod.tpl already injects it automatically whenever
         # presets.kubernetesAttributes.enabled is true and mode is
@@ -170,6 +188,12 @@
               # capacity/usage (k8s.volume.capacity/available/inodes*)
               # for the topolvm-provisioner PVCs used by this stack.
               metric_groups = [ "container" "pod" "node" "volume" ];
+              # k8s.container.memory_limit_utilization is opt-in (disabled
+              # by default) -- needed for the memory-%-of-limit panel,
+              # same reasoning as the "volume" group above for PVC %.
+              metrics = {
+                "k8s.container.memory_limit_utilization".enabled = true;
+              };
             };
           };
 
