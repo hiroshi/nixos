@@ -480,22 +480,10 @@
       };
     }
 
-    # Dashboards are provisioned as code the same way as the
-    # datasources above, rather than relying on the UI's own "Save"
-    # (which needs a Project to exist first, and this is more in
-    # keeping with the rest of this file anyway -- also, `perses`'s
-    # `persistence.enabled = false` means anything saved only via the
-    # UI is one pod restart away from being wiped for good, confirmed
-    # live). Per
-    # https://perses.dev/helm-charts/docs/managing-resources-with-configmaps/,
-    # a Dashboard's Project must exist before the Dashboard itself is
-    # provisioned, and each ConfigMap should hold exactly one resource
-    # (1MB ConfigMap data limit) -- hence separate ConfigMaps here, not
-    # one.
-    #
-    # Project name "k3s" matches the one already created by hand via
-    # the Perses UI before this was provisioned as code, rather than
-    # introducing a second, redundant project.
+    # The Project itself changes rarely, so it's still fine to provision
+    # this one via ConfigMap+sidecar. Name "k3s" matches the one already
+    # created by hand via the Perses UI before this was provisioned as
+    # code, rather than introducing a second, redundant project.
     {
       apiVersion = "v1";
       kind = "ConfigMap";
@@ -511,199 +499,18 @@
       };
     }
 
-    {
-      apiVersion = "v1";
-      kind = "ConfigMap";
-      metadata = {
-        name = "perses-dashboard-logs-static";
-        namespace = "monitoring";
-        labels."perses.dev/resource" = "true";
-      };
-      # This is a direct transcription of a dashboard actually built
-      # and JSON-exported from the Perses UI (three panels: raw logs,
-      # PVC usage %, PVC usage bytes), not a hand-guessed one -- the
-      # only change from the export is `legend.mode`: the UI's own
-      # export had it as `null` on both TimeSeriesChart panels, which
-      # the chart's bundled TimeSeriesChart plugin (0.12.1) rejects
-      # outright ("conflicting values null and \"list\""/"\"table\""),
-      # confirmed live via the UI's own Save erroring on exactly this
-      # field even with "List" apparently selected on screen -- set to
-      # "list" explicitly here instead.
-      #
-      # PVC-only filter (k8s.volume.name is unique to real PVCs here --
-      # "home"/"storage"/"server-volume" -- unlike the many noise
-      # volumes, see the volume-name survey in project memory);
-      # server-volume is shared by both VictoriaMetrics and
-      # VictoriaLogs pods, hence the pod name in seriesNameFormat to
-      # tell them apart.
-      data."dashboard.json" = builtins.toJSON {
-        kind = "Dashboard";
-        metadata = {
-          name = "logs";
-          project = "k3s";
-          version = 0;
-          tags = [ ];
-        };
-        spec = {
-          display.name = "logs";
-          panels = {
-            "e8155cd770c6422ebc6a1eeaf38e7fc6" = {
-              kind = "Panel";
-              spec = {
-                display.name = "";
-                plugin = {
-                  kind = "LogsTable";
-                  spec = {
-                    showTime = true;
-                    allowWrap = true;
-                    enableDetails = true;
-                  };
-                };
-                queries = [
-                  {
-                    kind = "LogQuery";
-                    spec.plugin = {
-                      kind = "VictoriaLogsLogQuery";
-                      spec = {
-                        query = "*";
-                        datasource = {
-                          kind = "VictoriaLogsDatasource";
-                          name = "victorialogs";
-                        };
-                      };
-                    };
-                  }
-                ];
-              };
-            };
-
-            "bbaa26b433aa401891e689b5e6007f67" = {
-              kind = "Panel";
-              spec = {
-                display.name = "PVC %";
-                plugin = {
-                  kind = "TimeSeriesChart";
-                  spec = {
-                    yAxis = {
-                      show = true;
-                      label = "";
-                      format.unit = "percent";
-                    };
-                    legend = {
-                      position = "bottom";
-                      mode = "list";
-                    };
-                  };
-                };
-                queries = [
-                  {
-                    kind = "TimeSeriesQuery";
-                    spec.plugin = {
-                      kind = "PrometheusTimeSeriesQuery";
-                      spec = {
-                        query = ''
-                          100 * (1 - (
-                            {__name__="k8s.volume.available", k8s.volume.name=~"home|storage|server-volume"}
-                            /
-                            {__name__="k8s.volume.capacity", k8s.volume.name=~"home|storage|server-volume"}
-                          ))'';
-                        seriesNameFormat = "{{k8s.pod.name}}: {{k8s.volume.name}}";
-                      };
-                    };
-                  }
-                ];
-              };
-            };
-
-            "d1850588f54947dea396d8089348a780" = {
-              kind = "Panel";
-              spec = {
-                display.name = "PVC usage";
-                plugin = {
-                  kind = "TimeSeriesChart";
-                  spec = {
-                    yAxis = {
-                      show = true;
-                      label = "usage";
-                      format.unit = "decbytes";
-                    };
-                    legend = {
-                      position = "bottom";
-                      mode = "list";
-                    };
-                  };
-                };
-                queries = [
-                  {
-                    kind = "TimeSeriesQuery";
-                    spec.plugin = {
-                      kind = "PrometheusTimeSeriesQuery";
-                      spec = {
-                        query = ''
-                          {__name__="k8s.volume.capacity", k8s.volume.name=~"home|storage|server-volume"}
-                          - {__name__="k8s.volume.available", k8s.volume.name=~"home|storage|server-volume"}'';
-                        seriesNameFormat = "{{k8s.pod.name}}: {{k8s.volume.name}}";
-                      };
-                    };
-                  }
-                ];
-              };
-            };
-          };
-
-          layouts = [
-            {
-              kind = "Grid";
-              spec = {
-                display = {
-                  title = "Log";
-                  collapse.open = true;
-                };
-                items = [
-                  {
-                    x = 0;
-                    y = 0;
-                    width = 24;
-                    height = 6;
-                    content."$ref" = "#/spec/panels/e8155cd770c6422ebc6a1eeaf38e7fc6";
-                  }
-                ];
-                repeatVariable = "";
-              };
-            }
-            {
-              kind = "Grid";
-              spec = {
-                display = {
-                  title = "PVC";
-                  collapse.open = true;
-                };
-                items = [
-                  {
-                    x = 0;
-                    y = 0;
-                    width = 12;
-                    height = 6;
-                    content."$ref" = "#/spec/panels/bbaa26b433aa401891e689b5e6007f67";
-                  }
-                  {
-                    x = 12;
-                    y = 0;
-                    width = 12;
-                    height = 6;
-                    content."$ref" = "#/spec/panels/d1850588f54947dea396d8089348a780";
-                  }
-                ];
-                repeatVariable = "";
-              };
-            }
-          ];
-
-          variables = [ ];
-          duration = "1h";
-          refreshInterval = "0s";
-        };
-      };
-    }
+    # Dashboards are deliberately NOT provisioned this way (a "logs"
+    # dashboard used to be here, ConfigMap+sidecar-managed like the
+    # Project above). Perses re-scans its provisioning folder every
+    # `config.provisioning.interval` (10m default) and overwrites
+    # whatever's live with the ConfigMap's content -- confirmed live: any
+    # edit made directly in the Perses UI (a rename, in this case) got
+    # silently reverted back within about ten minutes. Dashboards are
+    # actively being edited via Perses's own REST API instead (see
+    # project memory), so forcing them back to a stale ConfigMap on a
+    # timer would fight with that. If dashboards need to be captured back
+    # into git, do it by reading the live content via `GET
+    # /api/v1/projects/<project>/dashboards/<name>` and committing that,
+    # not by adding another provisioning ConfigMap here.
   ];
 }
