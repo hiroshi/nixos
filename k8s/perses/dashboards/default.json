@@ -3,8 +3,8 @@
   "metadata": {
     "name": "default",
     "createdAt": "2026-07-26T05:40:43.336500064Z",
-    "updatedAt": "2026-07-26T05:43:54.002133596Z",
-    "version": 2,
+    "updatedAt": "2026-07-26T08:03:46.621734456Z",
+    "version": 7,
     "project": "k3s"
   },
   "spec": {
@@ -12,82 +12,6 @@
       "name": "default"
     },
     "panels": {
-      "bbaa26b433aa401891e689b5e6007f67": {
-        "kind": "Panel",
-        "spec": {
-          "display": {
-            "name": "PVC %"
-          },
-          "plugin": {
-            "kind": "TimeSeriesChart",
-            "spec": {
-              "legend": {
-                "mode": "list",
-                "position": "bottom"
-              },
-              "yAxis": {
-                "format": {
-                  "unit": "percent"
-                },
-                "label": "",
-                "show": true
-              }
-            }
-          },
-          "queries": [
-            {
-              "kind": "TimeSeriesQuery",
-              "spec": {
-                "plugin": {
-                  "kind": "PrometheusTimeSeriesQuery",
-                  "spec": {
-                    "query": "100 * (1 - (\n  {__name__=\"k8s.volume.available\", k8s.volume.name=~\"home|storage|server-volume\"}\n  /\n  {__name__=\"k8s.volume.capacity\", k8s.volume.name=~\"home|storage|server-volume\"}\n))",
-                    "seriesNameFormat": "{{k8s.pod.name}}: {{k8s.volume.name}}"
-                  }
-                }
-              }
-            }
-          ]
-        }
-      },
-      "d1850588f54947dea396d8089348a780": {
-        "kind": "Panel",
-        "spec": {
-          "display": {
-            "name": "PVC usage"
-          },
-          "plugin": {
-            "kind": "TimeSeriesChart",
-            "spec": {
-              "legend": {
-                "mode": "list",
-                "position": "bottom"
-              },
-              "yAxis": {
-                "format": {
-                  "unit": "decbytes"
-                },
-                "label": "usage",
-                "show": true
-              }
-            }
-          },
-          "queries": [
-            {
-              "kind": "TimeSeriesQuery",
-              "spec": {
-                "plugin": {
-                  "kind": "PrometheusTimeSeriesQuery",
-                  "spec": {
-                    "query": "{__name__=\"k8s.volume.capacity\", k8s.volume.name=~\"home|storage|server-volume\"}\n- {__name__=\"k8s.volume.available\", k8s.volume.name=~\"home|storage|server-volume\"}",
-                    "seriesNameFormat": "{{k8s.pod.name}}: {{k8s.volume.name}}"
-                  }
-                }
-              }
-            }
-          ]
-        }
-      },
       "8767b5cdec4747e9b76f30236c98c23f": {
         "kind": "Panel",
         "spec": {
@@ -139,6 +63,15 @@
                 "mode": "list",
                 "position": "bottom"
               },
+              "visual": {
+                "areaOpacity": 0.3,
+                "connectNulls": false,
+                "display": "line",
+                "lineStyle": "solid",
+                "lineWidth": 1.25,
+                "pointRadius": 2.75,
+                "stack": "all"
+              },
               "yAxis": {
                 "format": {
                   "unit": "decbytes"
@@ -157,6 +90,91 @@
                   "spec": {
                     "query": "{__name__=\"container.memory.working_set\", k8s.container.name=~\"claude-code|dockerd|myapp|opentelemetry-collector|operator|perses|perses-provisioning-sidecar|cloudflared|tailscale|vlogs|vmsingle\"}",
                     "seriesNameFormat": "{{k8s.pod.name}}: {{k8s.container.name}}"
+                  }
+                }
+              }
+            }
+          ]
+        }
+      },
+      "bbaa26b433aa401891e689b5e6007f67": {
+        "kind": "Panel",
+        "spec": {
+          "display": {
+            "name": "PVC %"
+          },
+          "plugin": {
+            "kind": "TimeSeriesChart",
+            "spec": {
+              "legend": {
+                "mode": "list",
+                "position": "bottom"
+              },
+              "yAxis": {
+                "format": {
+                  "unit": "percent"
+                },
+                "label": "",
+                "show": true
+              }
+            }
+          },
+          "queries": [
+            {
+              "kind": "TimeSeriesQuery",
+              "spec": {
+                "plugin": {
+                  "kind": "PrometheusTimeSeriesQuery",
+                  "spec": {
+                    "query": "100 * (1 - (\n  {__name__=\"k8s.volume.available\", k8s.volume.name=~\"home|storage|server-volume\"}\n  /\n  {__name__=\"k8s.volume.capacity\", k8s.volume.name=~\"home|storage|server-volume\"}\n))",
+                    "seriesNameFormat": "{{k8s.pod.name}}: {{k8s.volume.name}}"
+                  }
+                }
+              }
+            }
+          ]
+        }
+      },
+      "d1850588f54947dea396d8089348a780": {
+        "kind": "Panel",
+        "spec": {
+          "display": {
+            "name": "PVC usage"
+          },
+          "plugin": {
+            "kind": "TimeSeriesChart",
+            "spec": {
+              "legend": {
+                "mode": "list",
+                "position": "bottom"
+              },
+              "visual": {
+                "areaOpacity": 0.3,
+                "connectNulls": false,
+                "display": "line",
+                "lineStyle": "solid",
+                "lineWidth": 1.25,
+                "pointRadius": 2.75,
+                "stack": "all"
+              },
+              "yAxis": {
+                "format": {
+                  "unit": "decbytes"
+                },
+                "label": "usage",
+                "show": true
+              }
+            }
+          },
+          "queries": [
+            {
+              "kind": "TimeSeriesQuery",
+              "spec": {
+                "plugin": {
+                  "kind": "PrometheusTimeSeriesQuery",
+                  "spec": {
+                    "query": "{__name__=\"k8s.volume.capacity\", k8s.volume.name=~\"home|storage|server-volume\"}\n- {__name__=\"k8s.volume.available\", k8s.volume.name=~\"home|storage|server-volume\"}",
+                    "seriesNameFormat": "{{k8s.pod.name}}: {{k8s.volume.name}}"
                   }
                 }
               }
