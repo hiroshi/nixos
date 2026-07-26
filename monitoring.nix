@@ -438,18 +438,33 @@
           default = true;
           plugin = {
             kind = "PrometheusDatasource";
-            spec.proxy = {
-              kind = "HTTPProxy";
-              spec = {
-                url = "http://victoria-metrics-single-server.monitoring.svc.cluster.local:8428";
-                allowedEndpoints = [
-                  { endpointPattern = "/api/v1/labels"; method = "POST"; }
-                  { endpointPattern = "/api/v1/series"; method = "POST"; }
-                  { endpointPattern = "/api/v1/metadata"; method = "GET"; }
-                  { endpointPattern = "/api/v1/query"; method = "POST"; }
-                  { endpointPattern = "/api/v1/query_range"; method = "POST"; }
-                  { endpointPattern = "/api/v1/label/([a-zA-Z0-9_-]+)/values"; method = "GET"; }
-                ];
+            spec = {
+              # Sets the *default* minStep for every query against this
+              # datasource that doesn't set its own -- Perses's query step
+              # calc is `query.minStep ?? datasource.scrapeInterval ?? "1m"`
+              # (perses/plugins prometheus-time-series-query/get-time-series-data.ts).
+              # Without this, panels silently floor to the "1m"
+              # DEFAULT_SCRAPE_INTERVAL regardless of actual data
+              # resolution -- confirmed live, graphs looked like 1-minute
+              # resolution even though the kubeletstats receiver actually
+              # pushes samples every ~20s (verified via a raw
+              # /api/v1/export against VictoriaMetrics). Per-panel minStep
+              # still overrides this where a panel wants something finer
+              # or coarser.
+              scrapeInterval = "20s";
+              proxy = {
+                kind = "HTTPProxy";
+                spec = {
+                  url = "http://victoria-metrics-single-server.monitoring.svc.cluster.local:8428";
+                  allowedEndpoints = [
+                    { endpointPattern = "/api/v1/labels"; method = "POST"; }
+                    { endpointPattern = "/api/v1/series"; method = "POST"; }
+                    { endpointPattern = "/api/v1/metadata"; method = "GET"; }
+                    { endpointPattern = "/api/v1/query"; method = "POST"; }
+                    { endpointPattern = "/api/v1/query_range"; method = "POST"; }
+                    { endpointPattern = "/api/v1/label/([a-zA-Z0-9_-]+)/values"; method = "GET"; }
+                  ];
+                };
               };
             };
           };
