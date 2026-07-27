@@ -4,8 +4,8 @@
     "createdAt": "2026-07-26T05:40:43.336500064Z",
     "name": "default",
     "project": "k3s",
-    "updatedAt": "2026-07-27T11:37:06.009060377Z",
-    "version": 11
+    "updatedAt": "2026-07-27T11:52:43.208767284Z",
+    "version": 12
   },
   "spec": {
     "display": {
@@ -128,7 +128,7 @@
                 "plugin": {
                   "kind": "PrometheusTimeSeriesQuery",
                   "spec": {
-                    "query": "sum by (k8s.pod.name, k8s.container.name) (100 * {__name__=\"k8s.container.memory_limit_utilization\", k8s.container.name=~\"${containers}\"})",
+                    "query": "sum by (k8s.pod.name, k8s.container.name) (100 * {__name__=\"k8s.container.memory_limit_utilization\", k8s.container.name=~\"$containers\"})",
                     "seriesNameFormat": "{{k8s.pod.name}}: {{k8s.container.name}}"
                   }
                 }
@@ -175,7 +175,7 @@
                 "plugin": {
                   "kind": "PrometheusTimeSeriesQuery",
                   "spec": {
-                    "query": "sum by (k8s.pod.name, k8s.container.name) ({__name__=\"container.memory.working_set\", k8s.container.name=~\"${containers}\"})",
+                    "query": "sum by (k8s.pod.name, k8s.container.name) ({__name__=\"container.memory.working_set\", k8s.container.name=~\"$containers\"})",
                     "seriesNameFormat": "{{k8s.pod.name}}: {{k8s.container.name}}"
                   }
                 }
@@ -304,16 +304,35 @@
     "refreshInterval": "0s",
     "variables": [
       {
-        "kind": "TextVariable",
+        "kind": "ListVariable",
         "spec": {
-          "constant": true,
+          "allowAllValue": true,
+          "allowMultiple": true,
+          "customAllValue": ".*",
           "display": {
-            "description": "Container names shown in the Memory panels (regex alternation)",
-            "hidden": true,
+            "description": "Filter which containers show in the Memory panels",
+            "hidden": false,
             "name": "Containers"
           },
           "name": "containers",
-          "value": "claude-code|dockerd|myapp|opentelemetry-collector|operator|perses|perses-provisioning-sidecar|cloudflared|tailscale|vlogs|vmsingle"
+          "plugin": {
+            "kind": "StaticListVariable",
+            "spec": {
+              "values": [
+                "claude-code",
+                "dockerd",
+                "myapp",
+                "opentelemetry-collector",
+                "operator",
+                "perses",
+                "perses-provisioning-sidecar",
+                "cloudflared",
+                "tailscale",
+                "vlogs",
+                "vmsingle"
+              ]
+            }
+          }
         }
       }
     ]
