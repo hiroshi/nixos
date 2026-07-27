@@ -101,9 +101,19 @@
             storageClassName = "topolvm-provisioner";
             size = "2Gi";
           };
+          # requests==limits at 256Mi/256Mi (the original value) left zero
+          # headroom above VictoriaLogs's own cache sizing (which
+          # auto-tunes to a fraction of the cgroup memory limit) -- a
+          # burst shortly after startup (observed: part-merge right after
+          # opening storage, 93 smallParts for the dataset at the time)
+          # pushed past the 256Mi cap and OOMKilled the process on a
+          # ~1-minute loop, CrashLoopBackOff for 4 days straight. Same
+          # zero-headroom shape as the dockerd fix in PR #19. Confirmed
+          # live via `kubectl patch` that raising just the limit to
+          # 512Mi (leaving the request at 256Mi) fixes it.
           resources = {
             requests.memory = "256Mi";
-            limits.memory = "256Mi";
+            limits.memory = "512Mi";
           };
         };
       };
