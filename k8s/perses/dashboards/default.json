@@ -4,8 +4,8 @@
     "createdAt": "2026-07-26T05:40:43.336500064Z",
     "name": "default",
     "project": "k3s",
-    "updatedAt": "2026-07-27T11:31:50.925178638Z",
-    "version": 10
+    "updatedAt": "2026-07-27T11:37:06.009060377Z",
+    "version": 11
   },
   "spec": {
     "display": {
@@ -194,8 +194,8 @@
             "kind": "TimeSeriesChart",
             "spec": {
               "legend": {
-                "mode": "list",
-                "position": "bottom"
+                "mode": "table",
+                "position": "right"
               },
               "yAxis": {
                 "format": {
@@ -232,8 +232,8 @@
             "kind": "TimeSeriesChart",
             "spec": {
               "legend": {
-                "mode": "list",
-                "position": "bottom"
+                "mode": "table",
+                "position": "right"
               },
               "visual": {
                 "areaOpacity": 0.3,
