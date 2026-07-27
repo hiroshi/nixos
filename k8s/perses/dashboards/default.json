@@ -4,8 +4,8 @@
     "createdAt": "2026-07-26T05:40:43.336500064Z",
     "name": "default",
     "project": "k3s",
-    "updatedAt": "2026-07-27T11:17:22.02322571Z",
-    "version": 8
+    "updatedAt": "2026-07-27T11:31:50.925178638Z",
+    "version": 10
   },
   "spec": {
     "display": {
@@ -109,8 +109,8 @@
             "kind": "TimeSeriesChart",
             "spec": {
               "legend": {
-                "mode": "list",
-                "position": "bottom"
+                "mode": "table",
+                "position": "right"
               },
               "yAxis": {
                 "format": {
@@ -128,7 +128,7 @@
                 "plugin": {
                   "kind": "PrometheusTimeSeriesQuery",
                   "spec": {
-                    "query": "sum by (k8s.pod.name, k8s.container.name) (100 * {__name__=\"k8s.container.memory_limit_utilization\", k8s.container.name=~\"claude-code|dockerd|myapp|opentelemetry-collector|operator|perses|perses-provisioning-sidecar|cloudflared|tailscale|vlogs|vmsingle\"})",
+                    "query": "sum by (k8s.pod.name, k8s.container.name) (100 * {__name__=\"k8s.container.memory_limit_utilization\", k8s.container.name=~\"${containers}\"})",
                     "seriesNameFormat": "{{k8s.pod.name}}: {{k8s.container.name}}"
                   }
                 }
@@ -147,16 +147,16 @@
             "kind": "TimeSeriesChart",
             "spec": {
               "legend": {
-                "mode": "list",
-                "position": "bottom"
+                "mode": "table",
+                "position": "right"
               },
               "visual": {
                 "areaOpacity": 0.3,
                 "connectNulls": false,
                 "display": "line",
                 "lineStyle": "solid",
-                "lineWidth": 1.25,
-                "pointRadius": 2.75,
+                "lineWidth": 1,
+                "pointRadius": 2.5,
                 "stack": "all"
               },
               "yAxis": {
@@ -175,7 +175,7 @@
                 "plugin": {
                   "kind": "PrometheusTimeSeriesQuery",
                   "spec": {
-                    "query": "sum by (k8s.pod.name, k8s.container.name) ({__name__=\"container.memory.working_set\", k8s.container.name=~\"claude-code|dockerd|myapp|opentelemetry-collector|operator|perses|perses-provisioning-sidecar|cloudflared|tailscale|vlogs|vmsingle\"})",
+                    "query": "sum by (k8s.pod.name, k8s.container.name) ({__name__=\"container.memory.working_set\", k8s.container.name=~\"${containers}\"})",
                     "seriesNameFormat": "{{k8s.pod.name}}: {{k8s.container.name}}"
                   }
                 }
@@ -301,6 +301,21 @@
         }
       }
     },
-    "refreshInterval": "0s"
+    "refreshInterval": "0s",
+    "variables": [
+      {
+        "kind": "TextVariable",
+        "spec": {
+          "constant": true,
+          "display": {
+            "description": "Container names shown in the Memory panels (regex alternation)",
+            "hidden": true,
+            "name": "Containers"
+          },
+          "name": "containers",
+          "value": "claude-code|dockerd|myapp|opentelemetry-collector|operator|perses|perses-provisioning-sidecar|cloudflared|tailscale|vlogs|vmsingle"
+        }
+      }
+    ]
   }
 }
