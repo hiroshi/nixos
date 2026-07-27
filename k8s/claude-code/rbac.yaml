@@ -17,3 +17,36 @@ roleRef:
   kind: ClusterRole
   name: edit
   apiGroup: rbac.authorization.k8s.io
+---
+# Read-only access into `monitoring` so the claude-code pod can inspect the
+# VictoriaMetrics/VictoriaLogs/Perses/otel-collector stack (kubectl get/logs)
+# without kubectl port-forward or the Service-DNS+urllib workaround. Kept as
+# an explicit namespaced Role (not the built-in `view` ClusterRole) so the
+# grant stays readable and minimal, and includes pods/log explicitly since
+# the built-in `view` role does not grant it.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: claude-code-monitoring-viewer
+  namespace: monitoring
+rules:
+  - apiGroups: [""]
+    resources: ["pods", "pods/log", "pods/status", "services", "endpoints", "configmaps", "events", "persistentvolumeclaims"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["apps"]
+    resources: ["deployments", "replicasets", "statefulsets", "daemonsets"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: claude-code-monitoring-viewer
+  namespace: monitoring
+subjects:
+  - kind: ServiceAccount
+    name: claude-code
+    namespace: default
+roleRef:
+  kind: Role
+  name: claude-code-monitoring-viewer
+  apiGroup: rbac.authorization.k8s.io
