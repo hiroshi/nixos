@@ -4,8 +4,8 @@
     "createdAt": "2026-07-26T05:40:43.336500064Z",
     "name": "default",
     "project": "k3s",
-    "updatedAt": "2026-07-27T11:52:43.208767284Z",
-    "version": 12
+    "updatedAt": "2026-07-27T11:59:17.070249552Z",
+    "version": 13
   },
   "spec": {
     "display": {
@@ -20,16 +20,25 @@
             "collapse": {
               "open": true
             },
-            "title": "Log"
+            "title": "Memory"
           },
           "items": [
             {
               "content": {
-                "$ref": "#/spec/panels/e8155cd770c6422ebc6a1eeaf38e7fc6"
+                "$ref": "#/spec/panels/8767b5cdec4747e9b76f30236c98c23f"
               },
               "height": 6,
-              "width": 24,
+              "width": 12,
               "x": 0,
+              "y": 0
+            },
+            {
+              "content": {
+                "$ref": "#/spec/panels/a233da967ff241408162e8f75881c829"
+              },
+              "height": 6,
+              "width": 12,
+              "x": 12,
               "y": 0
             }
           ]
@@ -73,25 +82,16 @@
             "collapse": {
               "open": true
             },
-            "title": "Memory"
+            "title": "Log"
           },
           "items": [
             {
               "content": {
-                "$ref": "#/spec/panels/8767b5cdec4747e9b76f30236c98c23f"
+                "$ref": "#/spec/panels/e8155cd770c6422ebc6a1eeaf38e7fc6"
               },
               "height": 6,
-              "width": 12,
+              "width": 24,
               "x": 0,
-              "y": 0
-            },
-            {
-              "content": {
-                "$ref": "#/spec/panels/a233da967ff241408162e8f75881c829"
-              },
-              "height": 6,
-              "width": 12,
-              "x": 12,
               "y": 0
             }
           ]
