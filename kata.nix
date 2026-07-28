@@ -108,8 +108,15 @@ in
         # unit. (An earlier attempt used the combined short flag `-Wy`,
         # which did not actually suppress the prompt -- spelling both
         # flags out explicitly here instead.)
-        lvcreate --yes --wipesignatures y -L 4G -n claude-code-docker-data myvg1
+        lvcreate --yes --wipesignatures y -L 20G -n claude-code-docker-data myvg1
         mkfs.ext4 -F /dev/myvg1/claude-code-docker-data
+      else
+        # Idempotently grow an already-created LV if the target size above
+        # was increased since it was first created (e.g. 4G -> 20G) --
+        # lvextend/resize2fs are no-ops if already at/above the target, same
+        # pattern as topolvm.nix's truncate -s / pvresize.
+        lvextend -L 20G /dev/myvg1/claude-code-docker-data || true
+        resize2fs /dev/myvg1/claude-code-docker-data
       fi
 
       kata-runtime direct-volume add \
