@@ -4,8 +4,8 @@
     "createdAt": "2026-07-26T05:40:43.336500064Z",
     "name": "default",
     "project": "k3s",
-    "updatedAt": "2026-07-27T11:59:17.070249552Z",
-    "version": 13
+    "updatedAt": "2026-07-27T12:09:45.519275773Z",
+    "version": 15
   },
   "spec": {
     "display": {
@@ -110,7 +110,12 @@
             "spec": {
               "legend": {
                 "mode": "table",
-                "position": "right"
+                "position": "right",
+                "size": "small",
+                "values": [
+                  "last",
+                  "max"
+                ]
               },
               "yAxis": {
                 "format": {
@@ -148,7 +153,12 @@
             "spec": {
               "legend": {
                 "mode": "table",
-                "position": "right"
+                "position": "right",
+                "size": "small",
+                "values": [
+                  "last",
+                  "max"
+                ]
               },
               "visual": {
                 "areaOpacity": 0.3,
@@ -195,7 +205,12 @@
             "spec": {
               "legend": {
                 "mode": "table",
-                "position": "right"
+                "position": "right",
+                "size": "small",
+                "values": [
+                  "last",
+                  "max"
+                ]
               },
               "yAxis": {
                 "format": {
@@ -233,7 +248,12 @@
             "spec": {
               "legend": {
                 "mode": "table",
-                "position": "right"
+                "position": "right",
+                "size": "small",
+                "values": [
+                  "last",
+                  "max"
+                ]
               },
               "visual": {
                 "areaOpacity": 0.3,
