@@ -116,6 +116,11 @@ in
         # lvextend/resize2fs are no-ops if already at/above the target, same
         # pattern as topolvm.nix's truncate -s / pvresize.
         lvextend -L 20G /dev/myvg1/claude-code-docker-data || true
+        # resize2fs refuses to run on an ext4 filesystem that was just grown
+        # by lvextend without a forced check first ("Please run 'e2fsck -f'
+        # first"). e2fsck -f exits 1 when it corrects (harmless, expected)
+        # errors -- only treat exit codes >1 as real failures.
+        e2fsck -f -y /dev/myvg1/claude-code-docker-data || [ $? -le 1 ]
         resize2fs /dev/myvg1/claude-code-docker-data
       fi
 
