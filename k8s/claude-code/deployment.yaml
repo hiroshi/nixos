@@ -98,6 +98,48 @@ spec:
             # tmpfs emptyDir lets overlay2 mount successfully instead.
             - name: docker-data
               mountPath: /var/lib/docker
+        - name: docker-df-exporter
+          # `docker system df`'s numbers (images/containers/volumes/build
+          # cache disk usage) aren't visible through the existing OTel
+          # Collector metrics (see monitoring.nix's file header): that
+          # collector's kubeletstats receiver reads kubelet's cgroup
+          # resource-usage view via the Summary API, which has no concept
+          # of dockerd's own storage bookkeeping -- a different data source
+          # (dockerd's Engine API, /system/df) entirely. This is a small,
+          # separate poll loop hitting that API directly over the shared
+          # docker-sock volume and pushing straight to VictoriaMetrics's
+          # Prometheus import endpoint on a timer.
+          image: alpine:3.20
+          command: ["/bin/sh", "-c"]
+          args:
+            # curl+jq installed at container startup rather than a
+            # custom-built image: dockerd's API responses use chunked
+            # transfer-encoding, which curl de-chunks correctly -- not
+            # worth reimplementing HTTP framing by hand for a poll loop
+            # this small.
+            - >-
+              set -eu &&
+              apk add --no-cache curl jq &&
+              while true; do
+              df="$(curl -sf --unix-socket /run/docker-sock/docker.sock 'http://localhost/system/df?verbose=1')";
+              images_bytes="$(echo "$df" | jq '.LayersSize // 0')";
+              containers_bytes="$(echo "$df" | jq '[.Containers[]?.SizeRw // 0] | add // 0')";
+              volumes_bytes="$(echo "$df" | jq '[.Volumes[]?.UsageData.Size // 0] | add // 0')";
+              buildcache_bytes="$(echo "$df" | jq '[.BuildCache[]?.Size // 0] | add // 0')";
+              buildcache_reclaimable_bytes="$(echo "$df" | jq '[.BuildCache[]? | select(.InUse == false) | .Size // 0] | add // 0')";
+              printf 'docker_disk_usage_bytes{type="images"} %s\ndocker_disk_usage_bytes{type="containers"} %s\ndocker_disk_usage_bytes{type="volumes"} %s\ndocker_disk_usage_bytes{type="build_cache"} %s\ndocker_disk_usage_reclaimable_bytes{type="build_cache"} %s\n'
+              "$images_bytes" "$containers_bytes" "$volumes_bytes" "$buildcache_bytes" "$buildcache_reclaimable_bytes"
+              | curl -sf --data-binary @- http://victoria-metrics-single-server.monitoring.svc.cluster.local:8428/api/v1/import/prometheus;
+              sleep 60;
+              done
+          resources:
+            requests:
+              memory: 32Mi
+            limits:
+              memory: 64Mi
+          volumeMounts:
+            - name: docker-sock
+              mountPath: /run/docker-sock
       volumes:
         - name: home
           persistentVolumeClaim:
