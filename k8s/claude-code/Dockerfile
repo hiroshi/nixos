@@ -14,11 +14,12 @@ RUN nix build --impure \
 
 # Copy the closure (dependency paths) as-is into /rootfs, and add symlinks
 # at stable paths for easier execution.
-RUN mkdir -p /rootfs/usr /rootfs/bin /rootfs/etc/ssl/certs && \
+RUN mkdir -p /rootfs/usr/share /rootfs/bin /rootfs/etc/ssl/certs && \
     nix-store -qR /result | xargs -I{} cp -a --parents {} /rootfs/ && \
     ln -s "$(readlink -f /result)/bin" /rootfs/usr/bin && \
     ln -s /usr/bin/bash /rootfs/bin/sh && \
-    ln -s "$(readlink -f /result)/etc/ssl/certs/ca-bundle.crt" /rootfs/etc/ssl/certs/ca-bundle.crt
+    ln -s "$(readlink -f /result)/etc/ssl/certs/ca-bundle.crt" /rootfs/etc/ssl/certs/ca-bundle.crt && \
+    ln -s "$(readlink -f /result)/share/zoneinfo" /rootfs/usr/share/zoneinfo
 
 FROM scratch
 COPY --from=builder /rootfs /

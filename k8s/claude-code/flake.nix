@@ -30,6 +30,7 @@
               pkgs.gnumake
               pkgs.gettext
               pkgs.jq
+              pkgs.tzdata
             ];
           };
         });

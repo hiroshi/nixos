@@ -40,6 +40,8 @@ spec:
           env:
             - name: DOCKER_HOST
               value: unix:///run/docker-sock/docker.sock
+            - name: TZ
+              value: Asia/Tokyo
           # Without an explicit memory limit, Kata sizes the guest VM off
           # its own small default (~2GB) instead of the host's real
           # capacity, and --capacity=32 sessions OOMKilled the container
