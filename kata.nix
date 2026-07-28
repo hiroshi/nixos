@@ -98,8 +98,15 @@ in
       set -eu
 
       if ! lvs myvg1/claude-code-docker-data >/dev/null 2>&1; then
-        lvcreate -L 4G -n claude-code-docker-data myvg1
-        mkfs.ext4 /dev/myvg1/claude-code-docker-data
+        # -Wy / -F: this VG has previously held other LVs (e.g. the
+        # hiroshi/nixos#32 spike's throwaway test LV) that were removed
+        # without zeroing -- lvremove doesn't erase data, so a freshly
+        # created LV can land on reused extents still carrying a stale
+        # filesystem signature. Both lvcreate and mkfs.ext4 would otherwise
+        # prompt interactively to confirm overwriting it, which hangs
+        # forever (defaults to "no") under a non-interactive systemd unit.
+        lvcreate -Wy -L 4G -n claude-code-docker-data myvg1
+        mkfs.ext4 -F /dev/myvg1/claude-code-docker-data
       fi
 
       kata-runtime direct-volume add \
