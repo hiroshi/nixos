@@ -5,6 +5,16 @@ metadata:
   namespace: default
 spec:
   replicas: 1
+  # docker-data is now a hostPath pointing at one dedicated host-side LV
+  # (see kata.nix), not a per-pod emptyDir -- the default RollingUpdate
+  # strategy briefly surges a second pod (maxSurge: 25% of 1 replica still
+  # rounds up to +1) that would mount the *same* ext4 filesystem from a
+  # second, concurrent Kata guest VM with no coordination between them,
+  # corrupting it (confirmed live: EUCLEAN mount failures after a
+  # RollingUpdate surge). Recreate guarantees the old pod (and its guest's
+  # mount) is fully gone before the new one starts.
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app: claude-code
