@@ -11,6 +11,12 @@
 { config, lib, pkgs, ... }:
 
 let
+  # Host-local path used purely as the direct-volume registry key -- it does
+  # not need to exist as a real directory. Must match the `hostPath.path` in
+  # k8s/claude-code/deployment.yaml's `docker-data` volume exactly, since
+  # Kata's virtcontainers matches on this string, not the LV/device path.
+  dockerDataDirectVolPath = "/var/lib/kata-directvol/claude-code-docker-data";
+
   # The shipped QEMU hypervisor config has `disable_block_device_use = true`
   # by default, which makes virtcontainers' checkBlockDeviceSupport() always
   # return false -- this silently skips Kata's direct-assigned-volume handling
@@ -64,6 +70,43 @@ in
   systemd.tmpfiles.rules = [
     "L+ /var/lib/rancher/k3s/agent/etc/containerd/config-v3.toml.tmpl - - - - ${configV3Tmpl}"
   ];
+
+  # Gives claude-code's dockerd sidecar a real block-backed volume for
+  # /var/lib/docker instead of the tmpfs emptyDir workaround (see
+  # hiroshi/nixos#32) -- lets overlay2 work (virtiofs rejects it with
+  # "invalid argument") without counting image layers/build cache against
+  # the pod's memory cgroup the way tmpfs pages do.
+  systemd.services.kata-docker-data-directvol-setup = {
+    description = "Provision and register the Kata direct-assigned block volume for claude-code's docker-data";
+    wantedBy = [ "multi-user.target" ];
+    # Needs myvg1 to exist first (topolvm.nix creates it), and must run
+    # before k3s starts creating containers, since virtcontainers only
+    # honors a direct-volume mount if its registry entry already exists at
+    # container-creation time.
+    after = [ "topolvm-lvm-setup.service" ];
+    before = [ "k3s.service" ];
+    path = [ pkgs.lvm2 pkgs.e2fsprogs pkgs.kata-runtime ];
+    serviceConfig = {
+      Type = "oneshot";
+      RemainAfterExit = true;
+    };
+    # The LV + its filesystem are created once and persist across reboots;
+    # only the direct-volume registration needs to be redone every boot,
+    # since virtcontainers reads its registry from /run (tmpfs, cleared on
+    # reboot).
+    script = ''
+      set -eu
+
+      if ! lvs myvg1/claude-code-docker-data >/dev/null 2>&1; then
+        lvcreate -L 4G -n claude-code-docker-data myvg1
+        mkfs.ext4 /dev/myvg1/claude-code-docker-data
+      fi
+
+      kata-runtime direct-volume add \
+        --volume-path '${dockerDataDirectVolPath}' \
+        --mount-info '{"volume-type":"block","device":"/dev/myvg1/claude-code-docker-data","fstype":"ext4","metadata":{},"options":[]}'
+    '';
+  };
 
   # Applied by k3s's own in-cluster deploy controller (which runs with full
   # server privilege), not by any pod's kubectl -- RuntimeClass is a
