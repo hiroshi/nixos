@@ -11,6 +11,18 @@
 { config, lib, pkgs, ... }:
 
 let
+  # The shipped QEMU hypervisor config has `disable_block_device_use = true`
+  # by default, which makes virtcontainers' checkBlockDeviceSupport() always
+  # return false -- this silently skips Kata's direct-assigned-volume handling
+  # entirely (container.go's mount loop just falls through to a normal
+  # virtiofs bind-mount even when a mountInfo.json is registered via
+  # `kata-runtime direct-volume add`). Confirmed by grepping the real shipped
+  # file: ${pkgs.kata-runtime}/share/defaults/kata-containers/configuration-qemu.toml.
+  kataConfigQemu = pkgs.runCommand "configuration-qemu-directvol.toml" { } ''
+    sed 's/^disable_block_device_use.*/disable_block_device_use = false/' \
+      ${pkgs.kata-runtime}/share/defaults/kata-containers/configuration-qemu.toml > $out
+  '';
+
   # k3s reads this file as a Go template and exposes the built-in default
   # config as a "base" template, so we don't need to hand-copy k3s's whole
   # stock containerd config here -- just render it via `{{ template "base"
@@ -25,6 +37,9 @@ let
       # privileged containers, which breaks (and defeats the point of) the
       # Kata VM boundary. Kata's own docs say this must be true.
       privileged_without_host_devices = true
+
+      [plugins.'io.containerd.cri.v1.runtime'.containerd.runtimes.'kata'.options]
+        ConfigPath = "${kataConfigQemu}"
   '';
 in
 {
