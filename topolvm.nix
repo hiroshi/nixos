@@ -26,25 +26,35 @@
       RemainAfterExit = true;
     };
     # Runs on every boot: re-attaches the loop device (loop associations do
-    # not survive a reboot) and only creates the PV/VG the first time.
+    # not survive a reboot), only creates the PV/VG the first time, and
+    # grows the backing file + PV/VG idempotently if the target size below
+    # was increased since the last boot (both `truncate -s` and `pvresize`
+    # are no-ops if already at the target size).
     script = ''
       set -eu
 
       img=/var/lib/topolvm/pv-disk.img
       mkdir -p /var/lib/topolvm
 
-      if [ ! -f "$img" ]; then
-        truncate -s 10G "$img"
-      fi
+      # Bumped 10G -> 50G: makes room for claude-code's dedicated
+      # docker-data LV (see kata.nix) plus real headroom for future
+      # multi-tenant PVCs, not just this one volume. Host root filesystem
+      # has 117G total / ~82G free, and the NixOS system itself (OS + nix
+      # store) doesn't need anywhere near that, so this leaves root with a
+      # ~32G margin to grow.
+      truncate -s 50G "$img"
 
       dev=$(losetup -j "$img" | cut -d: -f1)
       if [ -z "$dev" ]; then
         dev=$(losetup -f --show "$img")
       fi
+      losetup -c "$dev"
 
       if ! vgs myvg1 >/dev/null 2>&1; then
         pvcreate -f "$dev"
         vgcreate myvg1 "$dev"
+      else
+        pvresize "$dev"
       fi
     '';
   };
@@ -64,10 +74,11 @@
           name = "ssd";
           volume-group = "myvg1";
           default = true;
-          # The chart's default spare-gb (10) is a safety margin reserved as
-          # unallocatable; our VG is only 10G total, so that default would
-          # leave zero usable capacity. Keep a smaller margin instead.
-          spare-gb = 1;
+          # Safety margin reserved as unallocatable. Now that the VG is 50G
+          # (bumped from the original 10G, see the loopback size above),
+          # there's room for a more comfortable margin than the original
+          # 1G chosen back when the whole VG was only 10G.
+          spare-gb = 5;
         }
       ];
     };

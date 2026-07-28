@@ -11,6 +11,24 @@
 { config, lib, pkgs, ... }:
 
 let
+  # Host-local path used purely as the direct-volume registry key -- it does
+  # not need to exist as a real directory. Must match the `hostPath.path` in
+  # k8s/claude-code/deployment.yaml's `docker-data` volume exactly, since
+  # Kata's virtcontainers matches on this string, not the LV/device path.
+  dockerDataDirectVolPath = "/var/lib/kata-directvol/claude-code-docker-data";
+
+  # The shipped QEMU hypervisor config has `disable_block_device_use = true`
+  # by default, which makes virtcontainers' checkBlockDeviceSupport() always
+  # return false -- this silently skips Kata's direct-assigned-volume handling
+  # entirely (container.go's mount loop just falls through to a normal
+  # virtiofs bind-mount even when a mountInfo.json is registered via
+  # `kata-runtime direct-volume add`). Confirmed by grepping the real shipped
+  # file: ${pkgs.kata-runtime}/share/defaults/kata-containers/configuration-qemu.toml.
+  kataConfigQemu = pkgs.runCommand "configuration-qemu-directvol.toml" { } ''
+    sed 's/^disable_block_device_use.*/disable_block_device_use = false/' \
+      ${pkgs.kata-runtime}/share/defaults/kata-containers/configuration-qemu.toml > $out
+  '';
+
   # k3s reads this file as a Go template and exposes the built-in default
   # config as a "base" template, so we don't need to hand-copy k3s's whole
   # stock containerd config here -- just render it via `{{ template "base"
@@ -25,6 +43,9 @@ let
       # privileged containers, which breaks (and defeats the point of) the
       # Kata VM boundary. Kata's own docs say this must be true.
       privileged_without_host_devices = true
+
+      [plugins.'io.containerd.cri.v1.runtime'.containerd.runtimes.'kata'.options]
+        ConfigPath = "${kataConfigQemu}"
   '';
 in
 {
@@ -49,6 +70,65 @@ in
   systemd.tmpfiles.rules = [
     "L+ /var/lib/rancher/k3s/agent/etc/containerd/config-v3.toml.tmpl - - - - ${configV3Tmpl}"
   ];
+
+  # Gives claude-code's dockerd sidecar a real block-backed volume for
+  # /var/lib/docker instead of the tmpfs emptyDir workaround (see
+  # hiroshi/nixos#32) -- lets overlay2 work (virtiofs rejects it with
+  # "invalid argument") without counting image layers/build cache against
+  # the pod's memory cgroup the way tmpfs pages do.
+  systemd.services.kata-docker-data-directvol-setup = {
+    description = "Provision and register the Kata direct-assigned block volume for claude-code's docker-data";
+    wantedBy = [ "multi-user.target" ];
+    # Needs myvg1 to exist first (topolvm.nix creates it), and must run
+    # before k3s starts creating containers, since virtcontainers only
+    # honors a direct-volume mount if its registry entry already exists at
+    # container-creation time.
+    after = [ "topolvm-lvm-setup.service" ];
+    before = [ "k3s.service" ];
+    path = [ pkgs.lvm2 pkgs.e2fsprogs pkgs.kata-runtime ];
+    serviceConfig = {
+      Type = "oneshot";
+      RemainAfterExit = true;
+    };
+    # The LV + its filesystem are created once and persist across reboots;
+    # only the direct-volume registration needs to be redone every boot,
+    # since virtcontainers reads its registry from /run (tmpfs, cleared on
+    # reboot).
+    script = ''
+      set -eu
+
+      if ! lvs myvg1/claude-code-docker-data >/dev/null 2>&1; then
+        # --yes / --wipesignatures y / -F: this VG has previously held other
+        # LVs (e.g. the hiroshi/nixos#32 spike's throwaway test LV) that
+        # were removed without zeroing -- lvremove doesn't erase data, so a
+        # freshly created LV can land on reused extents still carrying a
+        # stale filesystem signature. Both lvcreate and mkfs.ext4 would
+        # otherwise prompt interactively to confirm overwriting it, which
+        # hangs forever (defaults to "no") under a non-interactive systemd
+        # unit. (An earlier attempt used the combined short flag `-Wy`,
+        # which did not actually suppress the prompt -- spelling both
+        # flags out explicitly here instead.)
+        lvcreate --yes --wipesignatures y -L 20G -n claude-code-docker-data myvg1
+        mkfs.ext4 -F /dev/myvg1/claude-code-docker-data
+      else
+        # Idempotently grow an already-created LV if the target size above
+        # was increased since it was first created (e.g. 4G -> 20G) --
+        # lvextend/resize2fs are no-ops if already at/above the target, same
+        # pattern as topolvm.nix's truncate -s / pvresize.
+        lvextend -L 20G /dev/myvg1/claude-code-docker-data || true
+        # resize2fs refuses to run on an ext4 filesystem that was just grown
+        # by lvextend without a forced check first ("Please run 'e2fsck -f'
+        # first"). e2fsck -f exits 1 when it corrects (harmless, expected)
+        # errors -- only treat exit codes >1 as real failures.
+        e2fsck -f -y /dev/myvg1/claude-code-docker-data || [ $? -le 1 ]
+        resize2fs /dev/myvg1/claude-code-docker-data
+      fi
+
+      kata-runtime direct-volume add \
+        --volume-path '${dockerDataDirectVolPath}' \
+        --mount-info '{"volume-type":"block","device":"/dev/myvg1/claude-code-docker-data","fstype":"ext4","metadata":{},"options":[]}'
+    '';
+  };
 
   # Applied by k3s's own in-cluster deploy controller (which runs with full
   # server privilege), not by any pod's kubectl -- RuntimeClass is a
