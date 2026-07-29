@@ -115,6 +115,27 @@ spec:
             # previous tmpfs emptyDir did.
             - name: docker-data
               mountPath: /var/lib/docker
+        - name: docker-df-exporter
+          # `docker system df`'s numbers (images/containers/volumes/build
+          # cache disk usage) aren't visible through the existing OTel
+          # Collector metrics (see monitoring.nix's file header): that
+          # collector's kubeletstats receiver reads kubelet's cgroup
+          # resource-usage view via the Summary API, which has no concept
+          # of dockerd's own storage bookkeeping -- a different data source
+          # (dockerd's Engine API, /system/df) entirely. This is a small,
+          # separate poll loop hitting that API directly over the shared
+          # docker-sock volume and pushing straight to VictoriaMetrics's
+          # Prometheus import endpoint on a timer. Image source:
+          # docker-df-exporter/ (built/pushed via this dir's Makefile).
+          image: ${DOCKER_DF_EXPORTER_IMAGE}
+          resources:
+            requests:
+              memory: 32Mi
+            limits:
+              memory: 64Mi
+          volumeMounts:
+            - name: docker-sock
+              mountPath: /run/docker-sock
       volumes:
         - name: home
           persistentVolumeClaim:
