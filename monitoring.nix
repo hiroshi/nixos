@@ -504,7 +504,12 @@
                     { endpointPattern = "/api/v1/metadata"; method = "GET"; }
                     { endpointPattern = "/api/v1/query"; method = "POST"; }
                     { endpointPattern = "/api/v1/query_range"; method = "POST"; }
-                    { endpointPattern = "/api/v1/label/([a-zA-Z0-9_-]+)/values"; method = "GET"; }
+                    # Label names in this cluster follow OTel semantic
+                    # conventions and contain dots (e.g. k8s.container.name),
+                    # so the character class must allow "." too -- otherwise
+                    # PrometheusLabelValuesVariable queries against those
+                    # labels get rejected as "endpoint not allowed".
+                    { endpointPattern = "/api/v1/label/([a-zA-Z0-9_.-]+)/values"; method = "GET"; }
                   ];
                 };
               };

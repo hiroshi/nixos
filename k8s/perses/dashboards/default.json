@@ -535,20 +535,12 @@
           },
           "name": "containers",
           "plugin": {
-            "kind": "StaticListVariable",
+            "kind": "PrometheusLabelValuesVariable",
             "spec": {
-              "values": [
-                "claude-code",
-                "dockerd",
-                "myapp",
-                "opentelemetry-collector",
-                "operator",
-                "perses",
-                "perses-provisioning-sidecar",
-                "cloudflared",
-                "tailscale",
-                "vlogs",
-                "vmsingle"
+              "labelName": "k8s.container.name",
+              "matchers": [
+                "{__name__=\"k8s.container.memory_limit_utilization\"}",
+                "{__name__=\"container.memory.working_set\"}"
               ]
             }
           }
