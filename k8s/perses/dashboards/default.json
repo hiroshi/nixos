@@ -4,8 +4,8 @@
     "createdAt": "2026-07-26T05:40:43.336500064Z",
     "name": "default",
     "project": "k3s",
-    "updatedAt": "2026-07-29T06:47:36.404492574Z",
-    "version": 22
+    "updatedAt": "2026-07-29T06:50:06.036556009Z",
+    "version": 23
   },
   "spec": {
     "display": {
@@ -51,7 +51,7 @@
             "collapse": {
               "open": true
             },
-            "title": "PVC"
+            "title": "PV"
           },
           "items": [
             {
@@ -229,7 +229,7 @@
         "kind": "Panel",
         "spec": {
           "display": {
-            "name": "PVC %"
+            "name": "PV %"
           },
           "plugin": {
             "kind": "TimeSeriesChart",
@@ -326,7 +326,7 @@
         "kind": "Panel",
         "spec": {
           "display": {
-            "name": "PVC usage"
+            "name": "PV usage"
           },
           "plugin": {
             "kind": "TimeSeriesChart",
