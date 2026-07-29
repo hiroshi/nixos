@@ -4,8 +4,8 @@
     "createdAt": "2026-07-26T05:40:43.336500064Z",
     "name": "default",
     "project": "k3s",
-    "updatedAt": "2026-07-29T06:50:06.036556009Z",
-    "version": 23
+    "updatedAt": "2026-07-29T11:21:20.866672734Z",
+    "version": 28
   },
   "spec": {
     "display": {
@@ -59,7 +59,7 @@
                 "$ref": "#/spec/panels/bbaa26b433aa401891e689b5e6007f67"
               },
               "height": 6,
-              "width": 12,
+              "width": 10,
               "x": 0,
               "y": 0
             },
@@ -68,8 +68,17 @@
                 "$ref": "#/spec/panels/d1850588f54947dea396d8089348a780"
               },
               "height": 6,
-              "width": 12,
-              "x": 12,
+              "width": 10,
+              "x": 10,
+              "y": 0
+            },
+            {
+              "content": {
+                "$ref": "#/spec/panels/a1b2c3d4e5f647a8b9c0d1e2f3a4b5c6"
+              },
+              "height": 6,
+              "width": 4,
+              "x": 20,
               "y": 0
             }
           ]
@@ -173,6 +182,60 @@
           ]
         }
       },
+      "a1b2c3d4e5f647a8b9c0d1e2f3a4b5c6": {
+        "kind": "Panel",
+        "spec": {
+          "display": {
+            "name": "TopoLVM VG usage"
+          },
+          "plugin": {
+            "kind": "TimeSeriesChart",
+            "spec": {
+              "visual": {
+                "areaOpacity": 0.15,
+                "connectNulls": false,
+                "display": "line",
+                "lineStyle": "solid",
+                "lineWidth": 1.25,
+                "pointRadius": 2.75
+              },
+              "yAxis": {
+                "format": {
+                  "unit": "decbytes"
+                },
+                "label": "",
+                "show": true
+              }
+            }
+          },
+          "queries": [
+            {
+              "kind": "TimeSeriesQuery",
+              "spec": {
+                "plugin": {
+                  "kind": "PrometheusTimeSeriesQuery",
+                  "spec": {
+                    "query": "max by (device_class, node) ({__name__=\"topolvm_volumegroup_size_bytes\"})",
+                    "seriesNameFormat": "cap: {{node}}: {{device_class}}"
+                  }
+                }
+              }
+            },
+            {
+              "kind": "TimeSeriesQuery",
+              "spec": {
+                "plugin": {
+                  "kind": "PrometheusTimeSeriesQuery",
+                  "spec": {
+                    "query": "max by (device_class, node) ({__name__=\"topolvm_volumegroup_size_bytes\"})\n- max by (device_class, node) ({__name__=\"topolvm_volumegroup_available_bytes\"})",
+                    "seriesNameFormat": "used: {{node}}: {{device_class}}"
+                  }
+                }
+              }
+            }
+          ]
+        }
+      },
       "a233da967ff241408162e8f75881c829": {
         "kind": "Panel",
         "spec": {
@@ -239,8 +302,7 @@
                 "position": "right",
                 "size": "small",
                 "values": [
-                  "last",
-                  "max"
+                  "last"
                 ]
               },
               "yAxis": {
@@ -336,8 +398,7 @@
                 "position": "right",
                 "size": "small",
                 "values": [
-                  "last",
-                  "max"
+                  "last"
                 ]
               },
               "visual": {

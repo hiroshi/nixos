@@ -205,6 +205,27 @@
                 "k8s.container.memory_limit_utilization".enabled = true;
               };
             };
+
+            # topolvm-node exposes the LVM volume group's real
+            # size/available bytes (topolvm_volumegroup_size_bytes /
+            # topolvm_volumegroup_available_bytes, labeled by device_class)
+            # on its own plain Prometheus /metrics -- confirmed live by
+            # curling each topolvm-system Pod IP directly (lvmd's own
+            # /metrics turned out to be just Go/process boilerplate, no app
+            # metrics). See the new topolvm-node-metrics Service in
+            # topolvm.nix, added because the topolvm chart doesn't expose
+            # that port via any Service itself. A static target (not
+            # kubernetes_sd_configs-based discovery) is enough: single-node
+            # cluster, one topolvm-node Pod, one Service.
+            prometheus.config.scrape_configs = [
+              {
+                job_name = "topolvm-node";
+                scrape_interval = "30s";
+                static_configs = [
+                  { targets = [ "topolvm-node-metrics.topolvm-system.svc.cluster.local:8080" ]; }
+                ];
+              }
+            ];
           };
 
           processors = {
@@ -233,6 +254,17 @@
             metrics = {
               receivers = [ ];
               processors = [ "k8sattributes" "memory_limiter" "batch" ];
+              exporters = [ "otlphttp/vm" ];
+            };
+            # Separate pipeline, not folded into `metrics` above: these are
+            # node/device-class-level VG metrics scraped from topolvm-node's
+            # own /metrics, not self-reported by a workload pod, so there's
+            # nothing meaningful for k8sattributes to enrich them with (and
+            # no need to depend on its IP-based pod association working for
+            # a scraped-not-self-reported target).
+            "metrics/topolvm" = {
+              receivers = [ "prometheus" ];
+              processors = [ "memory_limiter" "batch" ];
               exporters = [ "otlphttp/vm" ];
             };
             logs = {
