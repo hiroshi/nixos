@@ -4,8 +4,8 @@
     "createdAt": "2026-07-26T05:40:43.336500064Z",
     "name": "default",
     "project": "k3s",
-    "updatedAt": "2026-07-27T12:09:45.519275773Z",
-    "version": 15
+    "updatedAt": "2026-07-29T06:15:40.394758948Z",
+    "version": 20
   },
   "spec": {
     "display": {
@@ -66,6 +66,37 @@
             {
               "content": {
                 "$ref": "#/spec/panels/d1850588f54947dea396d8089348a780"
+              },
+              "height": 6,
+              "width": 12,
+              "x": 12,
+              "y": 0
+            }
+          ]
+        }
+      },
+      {
+        "kind": "Grid",
+        "spec": {
+          "display": {
+            "collapse": {
+              "open": true
+            },
+            "title": "Docker Disk Usage"
+          },
+          "items": [
+            {
+              "content": {
+                "$ref": "#/spec/panels/c4a5f6d8b3e14a2c9f0d1e2a3b4c5d6e"
+              },
+              "height": 6,
+              "width": 12,
+              "x": 0,
+              "y": 0
+            },
+            {
+              "content": {
+                "$ref": "#/spec/panels/f1a2b3c4d5e647f8a9b0c1d2e3f4a5b6"
               },
               "height": 6,
               "width": 12,
@@ -237,6 +268,60 @@
           ]
         }
       },
+      "c4a5f6d8b3e14a2c9f0d1e2a3b4c5d6e": {
+        "kind": "Panel",
+        "spec": {
+          "display": {
+            "name": "Docker Disk Usage (20GB cap)"
+          },
+          "plugin": {
+            "kind": "TimeSeriesChart",
+            "spec": {
+              "legend": {
+                "mode": "table",
+                "position": "right",
+                "size": "small",
+                "values": [
+                  "last",
+                  "max"
+                ]
+              },
+              "querySettings": [],
+              "visual": {
+                "areaOpacity": 0.3,
+                "connectNulls": false,
+                "display": "line",
+                "lineStyle": "solid",
+                "lineWidth": 1,
+                "pointRadius": 2.5,
+                "stack": "all"
+              },
+              "yAxis": {
+                "format": {
+                  "unit": "decbytes"
+                },
+                "label": "usage",
+                "max": 20000000000,
+                "show": true
+              }
+            }
+          },
+          "queries": [
+            {
+              "kind": "TimeSeriesQuery",
+              "spec": {
+                "plugin": {
+                  "kind": "PrometheusTimeSeriesQuery",
+                  "spec": {
+                    "query": "{__name__=\"docker_disk_usage_bytes\"}",
+                    "seriesNameFormat": "{{type}}"
+                  }
+                }
+              }
+            }
+          ]
+        }
+      },
       "d1850588f54947dea396d8089348a780": {
         "kind": "Panel",
         "spec": {
@@ -319,6 +404,58 @@
             }
           ]
         }
+      },
+      "f1a2b3c4d5e647f8a9b0c1d2e3f4a5b6": {
+        "kind": "Panel",
+        "spec": {
+          "display": {
+            "name": "Docker Disk Usage (reclaimable)"
+          },
+          "plugin": {
+            "kind": "TimeSeriesChart",
+            "spec": {
+              "legend": {
+                "mode": "table",
+                "position": "right",
+                "size": "small",
+                "values": [
+                  "last",
+                  "max"
+                ]
+              },
+              "visual": {
+                "areaOpacity": 0.3,
+                "connectNulls": false,
+                "display": "line",
+                "lineStyle": "solid",
+                "lineWidth": 1,
+                "pointRadius": 2.5,
+                "stack": "all"
+              },
+              "yAxis": {
+                "format": {
+                  "unit": "decbytes"
+                },
+                "label": "reclaimable",
+                "show": true
+              }
+            }
+          },
+          "queries": [
+            {
+              "kind": "TimeSeriesQuery",
+              "spec": {
+                "plugin": {
+                  "kind": "PrometheusTimeSeriesQuery",
+                  "spec": {
+                    "query": "{__name__=\"docker_disk_usage_reclaimable_bytes\"}",
+                    "seriesNameFormat": "{{type}}"
+                  }
+                }
+              }
+            }
+          ]
+        }
       }
     },
     "refreshInterval": "0s",
@@ -329,6 +466,7 @@
           "allowAllValue": true,
           "allowMultiple": true,
           "customAllValue": ".*",
+          "defaultValue": "$__all",
           "display": {
             "description": "Filter which containers show in the Memory panels",
             "hidden": false,
