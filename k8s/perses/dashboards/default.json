@@ -259,8 +259,8 @@
                 "plugin": {
                   "kind": "PrometheusTimeSeriesQuery",
                   "spec": {
-                    "query": "100 * (1 - (\n  {__name__=\"k8s.volume.available\", k8s.volume.name=~\"home|storage|server-volume\"}\n  /\n  {__name__=\"k8s.volume.capacity\", k8s.volume.name=~\"home|storage|server-volume\"}\n))",
-                    "seriesNameFormat": "{{k8s.pod.name}}: {{k8s.volume.name}}"
+                    "query": "100 * (1 - (\n  sum by (service.name, k8s.volume.name) ({__name__=\"k8s.volume.available\", k8s.volume.name=~\"home|storage|server-volume\"})\n  /\n  sum by (service.name, k8s.volume.name) ({__name__=\"k8s.volume.capacity\", k8s.volume.name=~\"home|storage|server-volume\"})\n))",
+                    "seriesNameFormat": "{{service.name}}: {{k8s.volume.name}}"
                   }
                 }
               }
@@ -365,8 +365,8 @@
                 "plugin": {
                   "kind": "PrometheusTimeSeriesQuery",
                   "spec": {
-                    "query": "{__name__=\"k8s.volume.capacity\", k8s.volume.name=~\"home|storage|server-volume\"}\n- {__name__=\"k8s.volume.available\", k8s.volume.name=~\"home|storage|server-volume\"}",
-                    "seriesNameFormat": "{{k8s.pod.name}}: {{k8s.volume.name}}"
+                    "query": "sum by (service.name, k8s.volume.name) ({__name__=\"k8s.volume.capacity\", k8s.volume.name=~\"home|storage|server-volume\"})\n- sum by (service.name, k8s.volume.name) ({__name__=\"k8s.volume.available\", k8s.volume.name=~\"home|storage|server-volume\"})",
+                    "seriesNameFormat": "{{service.name}}: {{k8s.volume.name}}"
                   }
                 }
               }
