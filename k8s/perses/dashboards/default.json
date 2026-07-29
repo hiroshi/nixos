@@ -4,8 +4,8 @@
     "createdAt": "2026-07-26T05:40:43.336500064Z",
     "name": "default",
     "project": "k3s",
-    "updatedAt": "2026-07-29T06:15:40.394758948Z",
-    "version": 20
+    "updatedAt": "2026-07-29T06:50:06.036556009Z",
+    "version": 23
   },
   "spec": {
     "display": {
@@ -51,7 +51,7 @@
             "collapse": {
               "open": true
             },
-            "title": "PVC"
+            "title": "PV"
           },
           "items": [
             {
@@ -229,7 +229,7 @@
         "kind": "Panel",
         "spec": {
           "display": {
-            "name": "PVC %"
+            "name": "PV %"
           },
           "plugin": {
             "kind": "TimeSeriesChart",
@@ -259,8 +259,8 @@
                 "plugin": {
                   "kind": "PrometheusTimeSeriesQuery",
                   "spec": {
-                    "query": "100 * (1 - (\n  {__name__=\"k8s.volume.available\", k8s.volume.name=~\"home|storage|server-volume\"}\n  /\n  {__name__=\"k8s.volume.capacity\", k8s.volume.name=~\"home|storage|server-volume\"}\n))",
-                    "seriesNameFormat": "{{k8s.pod.name}}: {{k8s.volume.name}}"
+                    "query": "100 * (1 - (\n  max by (service.name, k8s.volume.name) ({__name__=\"k8s.volume.available\", k8s.volume.name=~\"home|storage|server-volume\"})\n  /\n  max by (service.name, k8s.volume.name) ({__name__=\"k8s.volume.capacity\", k8s.volume.name=~\"home|storage|server-volume\"})\n))",
+                    "seriesNameFormat": "{{service.name}}: {{k8s.volume.name}}"
                   }
                 }
               }
@@ -326,7 +326,7 @@
         "kind": "Panel",
         "spec": {
           "display": {
-            "name": "PVC usage"
+            "name": "PV usage"
           },
           "plugin": {
             "kind": "TimeSeriesChart",
@@ -365,8 +365,8 @@
                 "plugin": {
                   "kind": "PrometheusTimeSeriesQuery",
                   "spec": {
-                    "query": "{__name__=\"k8s.volume.capacity\", k8s.volume.name=~\"home|storage|server-volume\"}\n- {__name__=\"k8s.volume.available\", k8s.volume.name=~\"home|storage|server-volume\"}",
-                    "seriesNameFormat": "{{k8s.pod.name}}: {{k8s.volume.name}}"
+                    "query": "max by (service.name, k8s.volume.name) ({__name__=\"k8s.volume.capacity\", k8s.volume.name=~\"home|storage|server-volume\"})\n- max by (service.name, k8s.volume.name) ({__name__=\"k8s.volume.available\", k8s.volume.name=~\"home|storage|server-volume\"})",
+                    "seriesNameFormat": "{{service.name}}: {{k8s.volume.name}}"
                   }
                 }
               }
