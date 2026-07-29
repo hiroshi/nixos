@@ -4,8 +4,8 @@
     "createdAt": "2026-07-26T05:40:43.336500064Z",
     "name": "default",
     "project": "k3s",
-    "updatedAt": "2026-07-29T06:08:33.750683176Z",
-    "version": 18
+    "updatedAt": "2026-07-29T06:15:40.394758948Z",
+    "version": 20
   },
   "spec": {
     "display": {
@@ -272,7 +272,7 @@
         "kind": "Panel",
         "spec": {
           "display": {
-            "name": "Docker Disk Usage"
+            "name": "Docker Disk Usage (20GB cap)"
           },
           "plugin": {
             "kind": "TimeSeriesChart",
@@ -286,6 +286,7 @@
                   "max"
                 ]
               },
+              "querySettings": [],
               "visual": {
                 "areaOpacity": 0.3,
                 "connectNulls": false,
@@ -300,6 +301,7 @@
                   "unit": "decbytes"
                 },
                 "label": "usage",
+                "max": 20000000000,
                 "show": true
               }
             }
@@ -464,6 +466,7 @@
           "allowAllValue": true,
           "allowMultiple": true,
           "customAllValue": ".*",
+          "defaultValue": "$__all",
           "display": {
             "description": "Filter which containers show in the Memory panels",
             "hidden": false,
