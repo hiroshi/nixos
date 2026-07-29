@@ -83,4 +83,36 @@
       ];
     };
   };
+
+  # The topolvm chart's own controller Service only exposes port 443
+  # (the validating webhook) -- none of the three pods' `metrics` container
+  # ports (8080, on topolvm-controller/topolvm-lvmd/topolvm-node alike) are
+  # reachable via any Service the chart creates. lvmd is the one that
+  # actually owns the LVM volume group and exposes
+  # `topolvm_volumegroup_size_bytes`/`topolvm_volumegroup_available_bytes`
+  # (labeled by device_class) -- the numbers behind the
+  # `capacity.topolvm.io/*` node annotations -- so it's the only one worth a
+  # Service for now. Single-node cluster (one lvmd Pod, this StatefulSet's
+  # `topolvm-lvmd-0`), so a plain selector-based Service is enough; see
+  # monitoring.nix for the OTel Collector scrape config pointed at it.
+  services.k3s.manifests.topolvm-lvmd-metrics-svc.content = [
+    {
+      apiVersion = "v1";
+      kind = "Service";
+      metadata = {
+        name = "topolvm-lvmd-metrics";
+        namespace = "topolvm-system";
+      };
+      spec = {
+        selector = {
+          "app.kubernetes.io/component" = "lvmd";
+          "app.kubernetes.io/instance" = "topolvm";
+          "app.kubernetes.io/name" = "topolvm";
+        };
+        ports = [
+          { name = "metrics"; port = 8080; targetPort = 8080; protocol = "TCP"; }
+        ];
+      };
+    }
+  ];
 }
