@@ -1,0 +1,33 @@
+# A second quick tunnel alongside the one myapp uses, so the portal gets its own
+# trycloudflare.com hostname (`make logs-url`). The portal is behind basic auth;
+# a quick tunnel is fine for the interim, not for the eventual public deployment.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cloudflared-tenant-portal
+  namespace: default
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: cloudflared-tenant-portal
+  template:
+    metadata:
+      labels:
+        app: cloudflared-tenant-portal
+    spec:
+      containers:
+        - name: cloudflared
+          image: cloudflare/cloudflared:latest
+          args:
+            - tunnel
+            - --no-autoupdate
+            - --url
+            - http://tenant-portal.default.svc.cluster.local:80
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              cpu: 100m
+              memory: 128Mi

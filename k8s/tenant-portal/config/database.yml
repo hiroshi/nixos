@@ -28,4 +28,5 @@ test:
 # ensure the database is located in a persisted volume.
 production:
   <<: *default
-  # database: path/to/persistent/storage/production.sqlite3
+  # storage/ is the PVC mount point (see deploy/deployment.yaml).
+  database: storage/production.sqlite3

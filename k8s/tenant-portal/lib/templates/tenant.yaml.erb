@@ -1,0 +1,157 @@
+<%#
+  Every resource a tenant needs, in one stream for `kubectl apply -f -`.
+  Rendered by TenantProvisioner; locals: namespace, tenant_name, image,
+  capacity, storage_size, supervisor_source.
+
+  Deleting a tenant deletes the namespace, which garbage-collects all of this
+  (including the PVC and its TopoLVM logical volume), so nothing here needs its
+  own cleanup path.
+-%>
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: <%= namespace %>
+  labels:
+    app.kubernetes.io/managed-by: tenant-portal
+    tenant-portal/tenant: <%= tenant_name %>
+    # The tenant's ServiceAccount holds `edit` in here, which includes creating
+    # pods -- without Pod Security Admission that would be enough to run a
+    # privileged pod and break out of the namespace (hiroshi/nixos#8). The
+    # claude-code container below is written to satisfy `restricted`.
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/enforce-version: latest
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: claude-code
+  namespace: <%= namespace %>
+---
+# A RoleBinding (not ClusterRoleBinding) to the built-in `edit` ClusterRole:
+# full read/write on ordinary workloads, but only inside this one namespace, and
+# the rule list stays in sync with upstream as new resource types are aggregated
+# into `edit`.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: claude-code-edit
+  namespace: <%= namespace %>
+subjects:
+  - kind: ServiceAccount
+    name: claude-code
+    namespace: <%= namespace %>
+roleRef:
+  kind: ClusterRole
+  name: edit
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: claude-code-home
+  namespace: <%= namespace %>
+spec:
+  storageClassName: topolvm-provisioner
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: <%= storage_size %>
+---
+# The supervisor ships as a ConfigMap rather than baked into the claude-code
+# image so iterating on the bootstrap flow doesn't need an image rebuild/push.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: tenant-agent
+  namespace: <%= namespace %>
+data:
+  supervisor.py: |
+<%= supervisor_source.each_line.map { |line| "    #{line}" }.join %>
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: claude-code
+  namespace: <%= namespace %>
+spec:
+  replicas: 1
+  # RWO PVC on a single node: a RollingUpdate surge would deadlock waiting for
+  # the old pod to release the volume.
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: claude-code
+  template:
+    metadata:
+      labels:
+        app: claude-code
+    spec:
+      serviceAccountName: claude-code
+      securityContext:
+        fsGroup: 1000
+        runAsUser: 1000
+        runAsGroup: 1000
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: claude-code
+          image: <%= image %>
+          # The image's ENTRYPOINT is claude itself; the supervisor takes over
+          # as PID 1 and drives claude through a pty instead.
+          command: ["/usr/bin/python3", "/opt/tenant-agent/supervisor.py"]
+          ports:
+            - containerPort: 8080
+          env:
+            - name: PORT
+              value: "8080"
+            - name: CLAUDE_CAPACITY
+              value: "<%= capacity %>"
+            - name: TZ
+              value: Asia/Tokyo
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+          # Interactive claude plus remote-control is a real Node.js process,
+          # not a thin CLI: a 128Mi-class limit OOMKills it seconds after the
+          # session connects.
+          resources:
+            requests:
+              memory: 1Gi
+            limits:
+              memory: 2Gi
+          readinessProbe:
+            httpGet:
+              path: /status
+              port: 8080
+            initialDelaySeconds: 2
+            periodSeconds: 5
+          volumeMounts:
+            - name: home
+              mountPath: /home/claude
+            - name: tenant-agent
+              mountPath: /opt/tenant-agent
+              readOnly: true
+      volumes:
+        - name: home
+          persistentVolumeClaim:
+            claimName: claude-code-home
+        - name: tenant-agent
+          configMap:
+            name: tenant-agent
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: claude-code
+  namespace: <%= namespace %>
+spec:
+  type: ClusterIP
+  selector:
+    app: claude-code
+  ports:
+    - port: 8080
+      targetPort: 8080

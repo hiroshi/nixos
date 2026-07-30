@@ -1,0 +1,23 @@
+<% content_for :title, "テナントを作成" %>
+
+<h1>テナントを作成</h1>
+
+<%= form_with model: @tenant do |form| %>
+  <% if @tenant.errors.any? %>
+    <ul class="errors">
+      <% @tenant.errors.full_messages.each do |message| %>
+        <li><%= message %></li>
+      <% end %>
+    </ul>
+  <% end %>
+
+  <p>
+    <%= form.label :name, "テナント名" %><br>
+    <span class="muted">namespace は <code><%= Tenant::NAMESPACE_PREFIX %>&lt;テナント名&gt;</code> になります。</span><br>
+    <%= form.text_field :name, autofocus: true, autocomplete: "off" %>
+  </p>
+
+  <p><%= form.submit "作成", class: "button" %></p>
+<% end %>
+
+<p><%= link_to "← 一覧に戻る", tenants_path %></p>

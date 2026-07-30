@@ -36,6 +36,9 @@
 !/app/assets/builds/.keep
 /public/assets
 
+# Ignore Kubernetes manifests (they are applied from the host, not the image).
+/deploy/
+
 # Ignore development files
 /.devcontainer
 

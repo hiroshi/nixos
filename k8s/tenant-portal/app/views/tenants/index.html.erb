@@ -1,0 +1,36 @@
+<% content_for :title, "テナント一覧" %>
+
+<h1>テナント</h1>
+
+<p><%= link_to "新しいテナントを作成", new_tenant_path, class: "button" %></p>
+
+<% if @tenants.empty? %>
+  <p class="muted">まだテナントがありません。</p>
+<% else %>
+  <table>
+    <thead>
+      <tr>
+        <th>名前</th>
+        <th>namespace</th>
+        <th>状態</th>
+        <th>claude</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      <% @tenants.each do |tenant| %>
+        <tr>
+          <td><%= link_to tenant.name, tenant %></td>
+          <td><code><%= tenant.namespace %></code></td>
+          <td><%= tenant.status %></td>
+          <td><%= phase_label(@phases[tenant.id]) %></td>
+          <td>
+            <%# No Turbo in this app, so the confirmation is a plain submit handler. %>
+            <%= button_to "削除", tenant, method: :delete, class: "danger",
+                  form: { onsubmit: "return confirm('#{tenant.namespace} を namespace ごと削除します。よろしいですか?')" } %>
+          </td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+<% end %>
