@@ -417,7 +417,7 @@
         "kind": "Panel",
         "spec": {
           "display": {
-            "name": "Node CPU usage"
+            "name": "Node CPU usage (12 cores)"
           },
           "plugin": {
             "kind": "TimeSeriesChart",
@@ -436,6 +436,7 @@
                   "unit": "decimal"
                 },
                 "label": "cores",
+                "max": 12,
                 "show": true
               }
             }
