@@ -1,7 +1,7 @@
 <%#
   Every resource a tenant needs, in one stream for `kubectl apply -f -`.
   Rendered by TenantProvisioner; locals: namespace, tenant_name, image,
-  capacity, storage_size, supervisor_source.
+  capacity, storage_size, supervisor_source, api_server_ip.
 
   Deleting a tenant deletes the namespace, which garbage-collects all of this
   (including the PVC and its TopoLVM logical volume), so nothing here needs its
@@ -158,3 +158,92 @@ spec:
   ports:
     - port: 8080
       targetPort: 8080
+---
+# Network isolation: nothing may reach the claude-code pod except the portal
+# (on 8080, the supervisor's API -- see README "Known gaps"), and the pod may
+# only reach CoreDNS, the Kubernetes API server, and the outside world -- never
+# another tenant's pod/Service, and never the LAN or Tailscale tailnet this
+# node sits on (confirmed reachable otherwise: private address space is not
+# inherently a Kubernetes-internal range, so a plain "everything but pod/
+# service CIDR" rule would have exposed every other device on the network, and
+# every other Tailscale-exposed service, to every tenant -- see the `except`
+# list below).
+#
+# The Kubernetes API server has no backing pod in k3s (its Endpoints point at
+# the control-plane node's real IP:6443, confirmed via `kubectl get endpoints
+# kubernetes`), so it can't be targeted by a podSelector, and an ipBlock
+# naming its ClusterIP (10.43.0.1/32) would not reliably match either --
+# traffic to it is NATed to the node's real address before this policy's
+# egress check runs. It gets its own narrow ipBlock rule below instead, built
+# from `api_server_ip` -- TenantProvisioner#manifests reads that same
+# Endpoints object live at render time (KubernetesClient#get("Endpoints",
+# "kubernetes", namespace: "default")) rather than it being hardcoded here.
+# kubectl ships in the claude-code image (see k8s/claude-code/flake.nix) and
+# the tenant's `edit` RoleBinding above is useless over the network without
+# this.
+#
+# This is discovered rather than hardcoded because a single-node k3s cluster
+# has no more stable handle on "the API server" to give egress to, and because
+# committing the node's real address to this template's git history is
+# exactly what this design avoids. If the node's address ever changes,
+# re-running `provision!` against an existing tenant (Server-Side Apply makes
+# that idempotent) picks up the new one.
+#
+# k3s's bundled NetworkPolicy controller (kube-router) has a documented history
+# of not reliably exempting kubelet-sourced readiness/liveness probe traffic
+# from ingress policies, since it arrives from the node's own IP rather than
+# through a Service or pod IP. If claude-code's readinessProbe stops passing
+# once this is applied, see README "Known gaps" for the workaround.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: namespace-isolation
+  namespace: <%= namespace %>
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: default
+          podSelector:
+            matchLabels:
+              app: tenant-portal
+      ports:
+        - protocol: TCP
+          port: 8080
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    - to:
+        - ipBlock:
+            cidr: <%= api_server_ip %>/32   # discovered at provision time; see comment above
+      ports:
+        - protocol: TCP
+          port: 6443
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              # Standard private/reserved address space, not a description of
+              # this cluster's actual layout -- deliberately broader than
+              # what's in use here so nothing about the network's real
+              # topology has to be committed or kept in sync with this file.
+              - 10.0.0.0/8       # RFC1918 (covers the pod CIDR 10.42.0.0/16 and Service CIDR 10.43.0.0/16)
+              - 172.16.0.0/12    # RFC1918
+              - 192.168.0.0/16   # RFC1918 (covers the node's LAN)
+              - 100.64.0.0/10    # CGNAT / Tailscale tailnet range
+              - 169.254.0.0/16   # link-local

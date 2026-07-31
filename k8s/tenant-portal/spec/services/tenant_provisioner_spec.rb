@@ -2,12 +2,21 @@ require "rails_helper"
 
 RSpec.describe TenantProvisioner do
   let(:tenant) { Tenant.new(name: "demo") }
-  let(:documents) { described_class.new(tenant).documents }
+  let(:api_server_endpoints) do
+    { "subsets" => [ { "addresses" => [ { "ip" => "203.0.113.10" } ] } ] }
+  end
+  let(:client) do
+    instance_double(KubernetesClient, get: nil).tap do |c|
+      allow(c).to receive(:get).with("Endpoints", "kubernetes", namespace: "default")
+        .and_return(api_server_endpoints)
+    end
+  end
+  let(:documents) { described_class.new(tenant, client: client).documents }
 
   describe "the rendered manifest" do
     it "renders every resource a tenant needs, the namespace first" do
       expect(documents.map { |doc| doc["kind"] }).to eq(
-        %w[Namespace ServiceAccount RoleBinding PersistentVolumeClaim ConfigMap Deployment Service]
+        %w[Namespace ServiceAccount RoleBinding PersistentVolumeClaim ConfigMap Deployment Service NetworkPolicy]
       )
     end
 
@@ -61,6 +70,29 @@ RSpec.describe TenantProvisioner do
 
       expect(config_map.dig("data", "supervisor.py")).to eq(described_class::SUPERVISOR_PATH.read)
     end
+
+    it "restricts ingress to the portal pod on 8080" do
+      ingress = documents.find { |doc| doc["kind"] == "NetworkPolicy" }.dig("spec", "ingress", 0)
+
+      expect(ingress.dig("from", 0, "podSelector", "matchLabels", "app")).to eq("tenant-portal")
+      expect(ingress.dig("ports", 0, "port")).to eq(8080)
+    end
+
+    it "builds the API server egress rule from the discovered address, never a hardcoded one" do
+      egress = documents.find { |doc| doc["kind"] == "NetworkPolicy" }.dig("spec", "egress")
+      api_rule = egress.find { |rule| rule.dig("ports", 0, "port") == 6443 }
+
+      expect(api_rule.dig("to", 0, "ipBlock", "cidr")).to eq("203.0.113.10/32")
+    end
+
+    it "excludes standard private address space from the outbound-everything rule, not a site-specific LAN" do
+      egress = documents.find { |doc| doc["kind"] == "NetworkPolicy" }.dig("spec", "egress")
+      outbound_rule = egress.find { |rule| rule.dig("to", 0, "ipBlock", "cidr") == "0.0.0.0/0" }
+
+      expect(outbound_rule.dig("to", 0, "ipBlock", "except")).to contain_exactly(
+        "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16", "100.64.0.0/10", "169.254.0.0/16"
+      )
+    end
   end
 
   describe "#provision!" do
@@ -68,17 +100,21 @@ RSpec.describe TenantProvisioner do
 
     it "applies each document once the namespace is known to be free" do
       allow(client).to receive(:get).with("Namespace", "tenant-demo").and_return(nil)
+      allow(client).to receive(:get).with("Endpoints", "kubernetes", namespace: "default")
+        .and_return(api_server_endpoints)
       allow(client).to receive(:apply)
 
       described_class.new(tenant, client: client).provision!
 
-      expect(client).to have_received(:apply).exactly(7).times
+      expect(client).to have_received(:apply).exactly(8).times
     end
 
     it "reconciles a namespace it created before" do
       allow(client).to receive(:get).and_return(
         { "metadata" => { "labels" => { described_class::MANAGED_BY_LABEL => described_class::MANAGED_BY_VALUE } } }
       )
+      allow(client).to receive(:get).with("Endpoints", "kubernetes", namespace: "default")
+        .and_return(api_server_endpoints)
       allow(client).to receive(:apply)
 
       expect { described_class.new(tenant, client: client).provision! }.not_to raise_error
