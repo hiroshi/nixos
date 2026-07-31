@@ -5,8 +5,9 @@ metadata:
   namespace: default
 ---
 # Cluster-scoped by necessity (it creates namespaces), but limited to exactly the
-# resource kinds lib/templates/tenant.yaml.erb renders -- notably no secrets, no
-# nodes, no cluster-scoped RBAC. Binding the built-in `admin` ClusterRole
+# resource kinds lib/templates/tenant.yaml.erb renders, plus a single read-only,
+# name-scoped grant on the `kubernetes` Endpoints object -- notably no secrets,
+# no nodes, no cluster-scoped RBAC. Binding the built-in `admin` ClusterRole
 # cluster-wide would have been shorter and far broader.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
@@ -30,6 +31,13 @@ rules:
   - apiGroups: ["networking.k8s.io"]
     resources: ["networkpolicies"]
     verbs: ["get", "list", "create", "patch", "update", "delete"]
+  # Read-only and scoped to exactly one object: the core Endpoints record that
+  # carries the API server's real address in this k3s cluster, needed to
+  # render a NetworkPolicy egress rule without hardcoding that address.
+  - apiGroups: [""]
+    resources: ["endpoints"]
+    resourceNames: ["kubernetes"]
+    verbs: ["get"]
   # RBAC's escalation check refuses a RoleBinding to permissions the creator
   # doesn't itself hold, unless the creator may `bind` that role. Granting
   # `bind` on just `edit` is the narrow way through: this SA can hand `edit` to a

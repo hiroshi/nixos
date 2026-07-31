@@ -75,11 +75,33 @@ docker run --rm -e RAILS_ENV=test -e SECRET_KEY_BASE=dummy <image> bundle exec r
 ## Network isolation
 
 Each tenant namespace carries a `NetworkPolicy` (`namespace-isolation`)
-restricting ingress on 8080 to the portal pod only, and egress to DNS plus the
-outside world (not other tenant pods/Services). Existing tenants provisioned
-before this was added don't have it until their namespace is re-provisioned
-(Server-Side Apply makes re-running `provision!` against an existing namespace
-safe and idempotent -- it only adds what's missing).
+restricting ingress on 8080 to the portal pod only, and egress to DNS, the
+Kubernetes API server, and the outside world -- never another tenant's
+pod/Service, and never the private address space (RFC1918, Tailscale's CGNAT
+range, and link-local) that this node's LAN and tailnet live in.
+
+The API server has no backing pod in k3s, so it can't be reached by a
+podSelector. `TenantProvisioner` looks up its real address at provision time
+from the core `Endpoints` object named `kubernetes` in the `default`
+namespace (the same thing `kubectl get endpoints kubernetes` shows) and
+renders it into a narrow ipBlock rule -- nothing about the node's real address
+is hardcoded or committed. If that address ever changes, re-running
+`provision!` (idempotent via Server-Side Apply) against an existing tenant
+picks up the new one.
+
+The broader egress exclusion is `10.0.0.0/8`, `172.16.0.0/12`,
+`192.168.0.0/16`, `100.64.0.0/10`, and `169.254.0.0/16` -- standard private,
+CGNAT, and link-local address space, not a description of this network's
+actual layout, so it's safe to commit without leaking topology. It's
+deliberately broader than this cluster's own pod/Service CIDRs (both fall
+inside `10.0.0.0/8`) or its one LAN segment (inside `192.168.0.0/16`). See the
+comment above the `NetworkPolicy` in `lib/templates/tenant.yaml.erb` for the
+full rationale.
+
+Existing tenants provisioned before this was added don't have it until their
+namespace is re-provisioned (Server-Side Apply makes re-running `provision!`
+against an existing namespace safe and idempotent -- it only adds what's
+missing).
 
 ## Known gaps
 

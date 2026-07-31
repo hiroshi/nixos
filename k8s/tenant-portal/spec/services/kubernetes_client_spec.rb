@@ -20,6 +20,11 @@ RSpec.describe KubernetesClient do
         .to eq("/apis/networking.k8s.io/v1/namespaces/tenant-demo/networkpolicies/namespace-isolation")
     end
 
+    it "addresses the Endpoints kind under /api/v1" do
+      expect(described_class.new.build_uri("Endpoints", "kubernetes", namespace: "default").path)
+        .to eq("/api/v1/namespaces/default/endpoints/kubernetes")
+    end
+
     it "does not scope a cluster-scoped resource to a namespace" do
       expect(described_class.new.build_uri("Namespace", "tenant-demo").path)
         .to eq("/api/v1/namespaces/tenant-demo")
