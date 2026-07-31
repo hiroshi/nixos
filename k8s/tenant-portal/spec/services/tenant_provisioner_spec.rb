@@ -28,6 +28,16 @@ RSpec.describe TenantProvisioner do
         .to eq("restricted")
     end
 
+    # remote-control names a new session's workspace after the pod hostname;
+    # without this it'd default to the pod-template-hash name.
+    it "names the pod after the tenant's namespace" do
+      hostname = documents
+        .find { |doc| doc["kind"] == "Deployment" }
+        .dig("spec", "template", "spec", "hostname")
+
+      expect(hostname).to eq("tenant-demo")
+    end
+
     it "gives the tenant container a security context that standard admits" do
       security_context = documents
         .find { |doc| doc["kind"] == "Deployment" }
