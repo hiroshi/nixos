@@ -89,11 +89,14 @@ class KubernetesClient
       raise Error, "#{kind} #{name} has no namespace"
     end
 
-    path = +resource.prefix
-    path << "/namespaces/#{namespace}" if resource.namespaced
-    path << "/#{resource.plural}/#{name}"
+    # Built by joining rather than appending: `<<` onto RESOURCES' own strings
+    # mutates the table in place, and every later request then addresses a path
+    # with the previous one's namespace still glued onto the front.
+    segments = [ resource.prefix ]
+    segments << "namespaces/#{namespace}" if resource.namespaced
+    segments << "#{resource.plural}/#{name}"
 
-    uri = URI.join(API_SERVER, path)
+    uri = URI.join(API_SERVER, segments.join("/"))
     uri.query = URI.encode_www_form(query) if query.present?
     uri
   end

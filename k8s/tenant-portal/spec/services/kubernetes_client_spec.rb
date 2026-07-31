@@ -20,6 +20,20 @@ RSpec.describe KubernetesClient do
         .to eq("/api/v1/namespaces/tenant-demo")
     end
 
+    # The route table is shared by every request the process serves, so building
+    # a path must not touch it. It once did, and each tenant's provisioning
+    # addressed the API at the previous tenant's namespace.
+    it "builds the same path however many times it is called" do
+      client = described_class.new
+      client.build_uri("ConfigMap", "tenant-agent", namespace: "tenant-one")
+      client.build_uri("Namespace", "tenant-one")
+
+      expect(described_class.new.build_uri("Namespace", "tenant-two").path)
+        .to eq("/api/v1/namespaces/tenant-two")
+      expect(described_class.new.build_uri("ConfigMap", "tenant-agent", namespace: "tenant-two").path)
+        .to eq("/api/v1/namespaces/tenant-two/configmaps/tenant-agent")
+    end
+
     it "appends query parameters" do
       uri = described_class.new.build_uri("Namespace", "tenant-demo", query: { propagationPolicy: "Background" })
 
