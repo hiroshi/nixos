@@ -88,6 +88,9 @@ spec:
       labels:
         app: claude-code
     spec:
+      # remote-control uses this as the workspace name for new sessions, so it
+      # should read as the tenant's namespace rather than a pod-template hash.
+      hostname: <%= namespace %>
       serviceAccountName: claude-code
       securityContext:
         fsGroup: 1000
