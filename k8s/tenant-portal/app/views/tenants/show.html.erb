@@ -1,0 +1,62 @@
+<% content_for :title, @tenant.name %>
+<%# The supervisor's phase changes without a user action (pod scheduling, image
+    pull, OAuth round trip), so transitional phases poll. %>
+<% if transitional_phase?(@status["phase"]) %>
+  <% content_for :head do %>
+    <meta http-equiv="refresh" content="3">
+  <% end %>
+<% end %>
+
+<h1><%= @tenant.name %></h1>
+<p class="muted">namespace: <code><%= @tenant.namespace %></code> / 状態: <%= @tenant.status %></p>
+
+<% if @tenant.last_error.present? %>
+  <pre class="errors"><%= @tenant.last_error %></pre>
+<% end %>
+
+<% if @status["error"].present? %>
+  <p class="errors"><%= @status["error"] %></p>
+<% end %>
+
+<% case @status["phase"] %>
+<% when TenantAgentClient::UNAVAILABLE %>
+  <h2>Pod を起動しています…</h2>
+  <p class="muted">イメージの取得とスケジューリングを待っています。この画面は自動更新されます。</p>
+
+<% when "logging_in" %>
+  <% if @status["auth_url"].blank? %>
+    <h2>認証 URL を取得しています…</h2>
+    <p class="muted">この画面は自動更新されます。</p>
+  <% elsif @status["awaiting_code"] %>
+    <h2>1. Claude にサインインしてください</h2>
+    <p><%= link_to "認証ページを開く", @status["auth_url"], target: "_blank", rel: "noopener", class: "button" %></p>
+    <h2>2. 表示された code を貼り付けてください</h2>
+    <%= form_with url: code_tenant_path(@tenant), method: :post do |form| %>
+      <p>
+        <%= form.text_field :code, size: 60, autofocus: true, autocomplete: "off" %>
+        <%= form.submit "送信", class: "button" %>
+      </p>
+    <% end %>
+  <% else %>
+    <h2>認証中…</h2>
+    <p class="muted">code を検証しています。この画面は自動更新されます。</p>
+  <% end %>
+
+<% when "starting" %>
+  <h2>claude を起動しています…</h2>
+  <p class="muted">Remote Control の接続を待っています。この画面は自動更新されます。</p>
+
+<% when "running" %>
+  <h2>セッションを開始できます</h2>
+  <p>
+    <%= link_to "claude.ai/code で開く", @status["session_url"], target: "_blank", rel: "noopener", class: "button" %>
+  </p>
+  <p class="muted">
+    Claude アプリや claude.ai/code のセッション一覧からも、この環境が選べます。
+  </p>
+
+<% else %>
+  <h2>状態: <%= @status["phase"] %></h2>
+<% end %>
+
+<p><%= link_to "← 一覧に戻る", tenants_path %></p>

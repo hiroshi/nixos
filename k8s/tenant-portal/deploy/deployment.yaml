@@ -1,0 +1,67 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tenant-portal
+  namespace: default
+spec:
+  replicas: 1
+  # SQLite on an RWO PVC: a RollingUpdate surge would have two pods on one
+  # volume (and deadlock on the mount anyway).
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: tenant-portal
+  template:
+    metadata:
+      labels:
+        app: tenant-portal
+    spec:
+      serviceAccountName: tenant-portal
+      imagePullSecrets:
+        - name: ghcr-pull-secret
+      containers:
+        - name: tenant-portal
+          image: ${IMAGE}
+          ports:
+            - containerPort: 80
+          env:
+            - name: SECRET_KEY_BASE
+              valueFrom:
+                secretKeyRef:
+                  name: tenant-portal-secrets
+                  key: SECRET_KEY_BASE
+            - name: PORTAL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: tenant-portal-secrets
+                  key: PORTAL_PASSWORD
+            # The image tenant pods run. Tenants get the same claude-code image
+            # the default namespace runs, not a portal-specific build.
+            - name: CLAUDE_CODE_IMAGE
+              value: ${CLAUDE_CODE_IMAGE}
+            - name: TZ
+              value: Asia/Tokyo
+          resources:
+            requests:
+              cpu: 50m
+              memory: 256Mi
+            limits:
+              memory: 512Mi
+          volumeMounts:
+            - name: storage
+              mountPath: /rails/storage
+          # /up is served by Rails::HealthController, which does not inherit the
+          # basic auth in ApplicationController.
+          readinessProbe:
+            httpGet:
+              path: /up
+              port: 80
+          livenessProbe:
+            httpGet:
+              path: /up
+              port: 80
+      volumes:
+        - name: storage
+          persistentVolumeClaim:
+            claimName: tenant-portal-storage

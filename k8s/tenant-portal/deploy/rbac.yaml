@@ -1,0 +1,50 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: tenant-portal
+  namespace: default
+---
+# Cluster-scoped by necessity (it creates namespaces), but limited to exactly the
+# resource kinds lib/templates/tenant.yaml.erb renders -- notably no secrets, no
+# nodes, no cluster-scoped RBAC. Binding the built-in `admin` ClusterRole
+# cluster-wide would have been shorter and far broader.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: tenant-portal
+rules:
+  # `kubectl apply` reads before it writes, and patches what already exists, so
+  # each kind needs get/patch alongside create.
+  - apiGroups: [""]
+    resources: ["namespaces"]
+    verbs: ["get", "list", "create", "patch", "update", "delete"]
+  - apiGroups: [""]
+    resources: ["serviceaccounts", "configmaps", "services", "persistentvolumeclaims"]
+    verbs: ["get", "list", "create", "patch", "update", "delete"]
+  - apiGroups: ["apps"]
+    resources: ["deployments"]
+    verbs: ["get", "list", "create", "patch", "update", "delete"]
+  - apiGroups: ["rbac.authorization.k8s.io"]
+    resources: ["rolebindings"]
+    verbs: ["get", "list", "create", "patch", "update", "delete"]
+  # RBAC's escalation check refuses a RoleBinding to permissions the creator
+  # doesn't itself hold, unless the creator may `bind` that role. Granting
+  # `bind` on just `edit` is the narrow way through: this SA can hand `edit` to a
+  # tenant namespace without holding `edit` everywhere itself.
+  - apiGroups: ["rbac.authorization.k8s.io"]
+    resources: ["clusterroles"]
+    resourceNames: ["edit"]
+    verbs: ["bind"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: tenant-portal
+subjects:
+  - kind: ServiceAccount
+    name: tenant-portal
+    namespace: default
+roleRef:
+  kind: ClusterRole
+  name: tenant-portal
+  apiGroup: rbac.authorization.k8s.io
