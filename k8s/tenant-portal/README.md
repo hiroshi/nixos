@@ -74,7 +74,7 @@ docker run --rm -e RAILS_ENV=test -e SECRET_KEY_BASE=dummy <image> bundle exec r
 
 ## Network isolation
 
-Each tenant namespace carries a `NetworkPolicy` (`claude-code-isolation`)
+Each tenant namespace carries a `NetworkPolicy` (`namespace-isolation`)
 restricting ingress on 8080 to the portal pod only, and egress to DNS plus the
 outside world (not other tenant pods/Services). Existing tenants provisioned
 before this was added don't have it until their namespace is re-provisioned

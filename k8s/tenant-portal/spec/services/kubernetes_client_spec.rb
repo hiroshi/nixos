@@ -16,8 +16,8 @@ RSpec.describe KubernetesClient do
     end
 
     it "addresses the NetworkPolicy kind under networking.k8s.io" do
-      expect(described_class.new.build_uri("NetworkPolicy", "claude-code-isolation", namespace: "tenant-demo").path)
-        .to eq("/apis/networking.k8s.io/v1/namespaces/tenant-demo/networkpolicies/claude-code-isolation")
+      expect(described_class.new.build_uri("NetworkPolicy", "namespace-isolation", namespace: "tenant-demo").path)
+        .to eq("/apis/networking.k8s.io/v1/namespaces/tenant-demo/networkpolicies/namespace-isolation")
     end
 
     it "does not scope a cluster-scoped resource to a namespace" do
