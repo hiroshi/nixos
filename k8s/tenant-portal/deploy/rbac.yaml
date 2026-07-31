@@ -27,6 +27,9 @@ rules:
   - apiGroups: ["rbac.authorization.k8s.io"]
     resources: ["rolebindings"]
     verbs: ["get", "list", "create", "patch", "update", "delete"]
+  - apiGroups: ["networking.k8s.io"]
+    resources: ["networkpolicies"]
+    verbs: ["get", "list", "create", "patch", "update", "delete"]
   # RBAC's escalation check refuses a RoleBinding to permissions the creator
   # doesn't itself hold, unless the creator may `bind` that role. Granting
   # `bind` on just `edit` is the narrow way through: this SA can hand `edit` to a

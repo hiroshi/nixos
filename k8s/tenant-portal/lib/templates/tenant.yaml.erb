@@ -155,3 +155,60 @@ spec:
   ports:
     - port: 8080
       targetPort: 8080
+---
+# Network isolation: nothing may reach the claude-code pod except the portal
+# (on 8080, the supervisor's API -- see README "Known gaps"), and the pod may
+# only reach CoreDNS and the outside world, never another tenant's pod/Service.
+#
+# The Kubernetes API server has no backing pod in k3s (its Endpoints point at
+# the control-plane node's real IP:6443), so it can't be targeted by a
+# podSelector, and an ipBlock naming its ClusterIP (10.43.0.1/32) would not
+# reliably match either -- traffic to it is NATed to the node's real address
+# before this policy's egress check runs. The broad internet-egress rule below
+# reaches it anyway, as a side effect of not excluding non-cluster addresses.
+#
+# k3s's bundled NetworkPolicy controller (kube-router) has a documented history
+# of not reliably exempting kubelet-sourced readiness/liveness probe traffic
+# from ingress policies, since it arrives from the node's own IP rather than
+# through a Service or pod IP. If claude-code's readinessProbe stops passing
+# once this is applied, see README "Known gaps" for the workaround.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: claude-code-isolation
+  namespace: <%= namespace %>
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: default
+          podSelector:
+            matchLabels:
+              app: tenant-portal
+      ports:
+        - protocol: TCP
+          port: 8080
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 10.42.0.0/16   # pod CIDR: no lateral movement into other tenants
+              - 10.43.0.0/16   # service CIDR: no reaching other cluster Services

@@ -7,7 +7,7 @@ RSpec.describe TenantProvisioner do
   describe "the rendered manifest" do
     it "renders every resource a tenant needs, the namespace first" do
       expect(documents.map { |doc| doc["kind"] }).to eq(
-        %w[Namespace ServiceAccount RoleBinding PersistentVolumeClaim ConfigMap Deployment Service]
+        %w[Namespace ServiceAccount RoleBinding PersistentVolumeClaim ConfigMap Deployment Service NetworkPolicy]
       )
     end
 
@@ -51,6 +51,13 @@ RSpec.describe TenantProvisioner do
 
       expect(config_map.dig("data", "supervisor.py")).to eq(described_class::SUPERVISOR_PATH.read)
     end
+
+    it "restricts ingress to the portal pod on 8080" do
+      ingress = documents.find { |doc| doc["kind"] == "NetworkPolicy" }.dig("spec", "ingress", 0)
+
+      expect(ingress.dig("from", 0, "podSelector", "matchLabels", "app")).to eq("tenant-portal")
+      expect(ingress.dig("ports", 0, "port")).to eq(8080)
+    end
   end
 
   describe "#provision!" do
@@ -62,7 +69,7 @@ RSpec.describe TenantProvisioner do
 
       described_class.new(tenant, client: client).provision!
 
-      expect(client).to have_received(:apply).exactly(7).times
+      expect(client).to have_received(:apply).exactly(8).times
     end
 
     it "reconciles a namespace it created before" do

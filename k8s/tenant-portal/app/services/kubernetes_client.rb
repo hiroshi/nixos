@@ -50,7 +50,8 @@ class KubernetesClient
     "Service" => Resource.new("/api/v1", "services", true),
     "PersistentVolumeClaim" => Resource.new("/api/v1", "persistentvolumeclaims", true),
     "Deployment" => Resource.new("/apis/apps/v1", "deployments", true),
-    "RoleBinding" => Resource.new("/apis/rbac.authorization.k8s.io/v1", "rolebindings", true)
+    "RoleBinding" => Resource.new("/apis/rbac.authorization.k8s.io/v1", "rolebindings", true),
+    "NetworkPolicy" => Resource.new("/apis/networking.k8s.io/v1", "networkpolicies", true)
   }.freeze
 
   # Server-Side Apply of one parsed manifest document.

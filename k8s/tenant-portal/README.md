@@ -72,11 +72,17 @@ No Ruby on the claude-code pod, so run them in the built image:
 docker run --rm -e RAILS_ENV=test -e SECRET_KEY_BASE=dummy <image> bundle exec rspec
 ```
 
+## Network isolation
+
+Each tenant namespace carries a `NetworkPolicy` (`claude-code-isolation`)
+restricting ingress on 8080 to the portal pod only, and egress to DNS plus the
+outside world (not other tenant pods/Services). Existing tenants provisioned
+before this was added don't have it until their namespace is re-provisioned
+(Server-Side Apply makes re-running `provision!` against an existing namespace
+safe and idempotent -- it only adds what's missing).
+
 ## Known gaps
 
-- The supervisor's `/status` and `/code` are reachable from any pod in the
-  cluster; the OAuth code crosses the cluster network in plaintext. A
-  NetworkPolicy restricting ingress to this portal is the next step.
 - No ResourceQuota/LimitRange per tenant yet: tenants are only bounded by the
   Deployment's own requests/limits and a 1Gi PVC.
 - Basic auth is interim. The intended public deployment is on an external VM with
