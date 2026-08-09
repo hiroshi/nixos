@@ -61,6 +61,19 @@ let
   configV3Tmpl = pkgs.writeText "config-v3.toml.tmpl" ''
     {{ template "base" . }}
 
+    # kata.nix's own `enable_debug = true` (see kataConfigQemu above) only
+    # *preserves* an already-elevated shim log level -- it doesn't raise it.
+    # The shimv2 process only starts at Debug level if containerd itself
+    # tells it to, which requires this top-level [debug]. Confirmed (via
+    # containerd's pkg/cri/config source) that there's no way to scope this
+    # to just the kata runtime on the io.containerd.cri.v1.runtime plugin
+    # this k3s uses -- the old shim_debug field only ever existed under the
+    # now-legacy io.containerd.runtime.v1.linux (shim v1) plugin. So this is
+    # node-wide: every containerd runtime (including plain runc containers)
+    # logs at debug level now, not just kata.
+    [debug]
+      level = "debug"
+
     [plugins.'io.containerd.cri.v1.runtime'.containerd.runtimes.'kata']
       runtime_type = "io.containerd.kata.v2"
       # Without this, containerd tries to pass every host device into
