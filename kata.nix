@@ -24,8 +24,32 @@ let
   # virtiofs bind-mount even when a mountInfo.json is registered via
   # `kata-runtime direct-volume add`). Confirmed by grepping the real shipped
   # file: ${pkgs.kata-runtime}/share/defaults/kata-containers/configuration-qemu.toml.
+  #
+  # `enable_debug = false` -> true (all 3 occurrences: [hypervisor.qemu],
+  # [agent.kata], [runtime]) -- after a 2026-08-09 incident where the
+  # claude-code pod's Kata sandbox died with the shim only logging "Dead
+  # agent" / "CheckRequest timed out" (containerd-shim-v2 lost its vsock
+  # ping to the in-guest kata-agent), with *no* corresponding entry in the
+  # host's kernel log or systemd-oomd log -- i.e. something killed the
+  # guest from *inside* the guest's own kernel, which the host has no
+  # visibility into at all. Confirmed by reading kata-containers v3.29.0
+  # source (the version this flake.lock's nixpkgs pin resolves to):
+  # sandbox.go's startVM() only creates the console watcher that streams
+  # the guest's console.sock line-by-line into the shim's own log (as
+  # `msg="reading guest console"`) when HypervisorConfig.Debug is true
+  # (i.e. [hypervisor.qemu] enable_debug); and that Debug()-level call is
+  # filtered out entirely unless the runtime's own log level is also
+  # raised, which config.go only does when [runtime] enable_debug is true
+  # -- so both must be flipped together for the console stream to actually
+  # reach the shim's log output ([agent.kata] enable_debug flipped too, for
+  # the in-guest agent's own debug-level messages as a second signal).
+  # With this, a future guest-side OOM-killer/panic would show up in the
+  # same `kata[PID]:` journald source already used to diagnose this
+  # incident, instead of leaving no trace at all.
   kataConfigQemu = pkgs.runCommand "configuration-qemu-directvol.toml" { } ''
-    sed 's/^disable_block_device_use.*/disable_block_device_use = false/' \
+    sed \
+      -e 's/^disable_block_device_use.*/disable_block_device_use = false/' \
+      -e 's/^enable_debug = false/enable_debug = true/' \
       ${pkgs.kata-runtime}/share/defaults/kata-containers/configuration-qemu.toml > $out
   '';
 
