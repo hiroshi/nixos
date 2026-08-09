@@ -47,6 +47,9 @@ let
   # same `kata[PID]:` journald source already used to diagnose this
   # incident, instead of leaving no trace at all.
   kataConfigQemu = pkgs.runCommand "configuration-qemu-directvol.toml" { } ''
+    # no-op comment: bumps this derivation's store hash without changing
+    # $out's content, to test that PR #51's restartTriggers actually
+    # restarts k3s on a config-template rebuild.
     sed \
       -e 's/^disable_block_device_use.*/disable_block_device_use = false/' \
       -e 's/^enable_debug = false/enable_debug = true/' \
