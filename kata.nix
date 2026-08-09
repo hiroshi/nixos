@@ -91,6 +91,15 @@ in
   # for the "kata" runtime handler configured below.
   systemd.services.k3s.path = [ pkgs.kata-runtime ];
 
+  # k3s only renders configV3Tmpl's Go template into the live containerd
+  # config.toml at its own process startup -- switch-to-configuration doesn't
+  # restart a service just because a systemd.tmpfiles.rules symlink target
+  # changed, so without this, a nixos-rebuild switch can silently leave k3s
+  # running against a stale rendered config indefinitely (bit us with the
+  # enable_debug fix above: the new config existed on disk but wasn't live
+  # until a manual `systemctl restart k3s`).
+  systemd.services.k3s.restartTriggers = [ configV3Tmpl ];
+
   systemd.tmpfiles.rules = [
     "L+ /var/lib/rancher/k3s/agent/etc/containerd/config-v3.toml.tmpl - - - - ${configV3Tmpl}"
   ];
