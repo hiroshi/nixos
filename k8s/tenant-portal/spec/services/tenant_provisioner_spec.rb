@@ -62,10 +62,19 @@ RSpec.describe TenantProvisioner do
     end
 
     it "restricts ingress to the portal pod on 8080" do
-      ingress = documents.find { |doc| doc["kind"] == "NetworkPolicy" }.dig("spec", "ingress", 0)
+      ingress = documents.find { |doc| doc["kind"] == "NetworkPolicy" }.dig("spec", "ingress", 1)
 
       expect(ingress.dig("from", 0, "podSelector", "matchLabels", "app")).to eq("tenant-portal")
       expect(ingress.dig("ports", 0, "port")).to eq(8080)
+    end
+
+    it "allows pods within the tenant's own namespace to reach each other" do
+      network_policy = documents.find { |doc| doc["kind"] == "NetworkPolicy" }
+      ingress = network_policy.dig("spec", "ingress", 0)
+      egress = network_policy.dig("spec", "egress").find { |rule| rule.dig("to", 0).keys == %w[podSelector] }
+
+      expect(ingress.dig("from", 0)).to eq({ "podSelector" => {} })
+      expect(egress.dig("to", 0)).to eq({ "podSelector" => {} })
     end
 
     it "builds the API server egress rule from the discovered address, never a hardcoded one" do

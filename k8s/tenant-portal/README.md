@@ -114,11 +114,6 @@ missing).
   overrides, so that's a configuration change, not a code change).
 - Tenants can't run `docker build`: no dockerd sidecar and no Kata runtime class,
   unlike the `default` namespace's claude-code pod.
-- The `namespace-isolation` NetworkPolicy's `podSelector: {}` covers every pod
-  in the tenant's namespace, but its ingress/egress rules don't include a
-  same-namespace allow -- pods the tenant creates alongside claude-code (their
-  `edit` role permits this) can't reach each other. Only matters once a tenant
-  runs more than the one claude-code pod.
 - The tenant's `edit` RoleBinding includes full CRUD on
   `networkpolicies.networking.k8s.io` (it's one of the resources aggregated
   into the built-in `edit` ClusterRole), so a tenant can edit or delete

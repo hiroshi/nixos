@@ -157,8 +157,9 @@ spec:
       targetPort: 8080
 ---
 # Network isolation: nothing may reach the claude-code pod except the portal
-# (on 8080, the supervisor's API -- see README "Known gaps"), and the pod may
-# only reach CoreDNS, the Kubernetes API server, and the outside world -- never
+# (on 8080, the supervisor's API -- see README "Known gaps") and other pods in
+# the tenant's own namespace, and the pod may only reach other pods in its own
+# namespace, CoreDNS, the Kubernetes API server, and the outside world -- never
 # another tenant's pod/Service, and never the LAN or Tailscale tailnet this
 # node sits on (confirmed reachable otherwise: private address space is not
 # inherently a Kubernetes-internal range, so a plain "everything but pod/
@@ -202,6 +203,11 @@ spec:
     - Ingress
     - Egress
   ingress:
+    # A podSelector with no namespaceSelector matches pods in this policy's
+    # own namespace -- the tenant's `edit` role lets it run more than the one
+    # claude-code pod, and those pods need to reach each other.
+    - from:
+        - podSelector: {}
     - from:
         - namespaceSelector:
             matchLabels:
@@ -213,6 +219,8 @@ spec:
         - protocol: TCP
           port: 8080
   egress:
+    - to:
+        - podSelector: {}
     - to:
         - namespaceSelector:
             matchLabels:
