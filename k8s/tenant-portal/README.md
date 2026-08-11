@@ -75,10 +75,15 @@ docker run --rm -e RAILS_ENV=test -e SECRET_KEY_BASE=dummy <image> bundle exec r
 ## Network isolation
 
 Each tenant namespace carries a `NetworkPolicy` (`namespace-isolation`)
-restricting ingress on 8080 to the portal pod only, and egress to DNS, the
-Kubernetes API server, and the outside world -- never another tenant's
-pod/Service, and never the private address space (RFC1918, Tailscale's CGNAT
-range, and link-local) that this node's LAN and tailnet live in.
+restricting ingress on 8080 to the portal pod and the tenant's own namespace,
+and egress to the tenant's own namespace, DNS, the Kubernetes API server, and
+the outside world -- never another tenant's pod/Service, and never the
+private address space (RFC1918, Tailscale's CGNAT range, and link-local) that
+this node's LAN and tailnet live in. A `ValidatingAdmissionPolicy`
+(`deploy/networkpolicy-protection.yaml`) stops a tenant editing, deleting, or
+supplementing that policy themselves -- see "Known gaps" below for why that
+needed to be a resource-level control rather than restricting one
+ServiceAccount.
 
 The API server has no backing pod in k3s, so it can't be reached by a
 podSelector. `TenantProvisioner` looks up its real address at provision time
@@ -116,9 +121,20 @@ missing).
   unlike the `default` namespace's claude-code pod.
 - The tenant's `edit` RoleBinding includes full CRUD on
   `networkpolicies.networking.k8s.io` (it's one of the resources aggregated
-  into the built-in `edit` ClusterRole), so a tenant can edit or delete
-  `namespace-isolation` themselves and remove their own network isolation.
-  `edit` was chosen so the rule list stays in sync with upstream (see the
-  RoleBinding's comment); reconciling that with "don't let tenants touch this
-  one policy" needs either a narrower custom role (breaking that sync) or an
-  admission policy blocking SA `claude-code` from writing NetworkPolicy.
+  into the built-in `edit` ClusterRole), so without another control a tenant
+  could edit or delete `namespace-isolation` themselves and remove their own
+  network isolation -- or, since NetworkPolicy selecting the same pod are
+  additive, just create a second permissive one instead. Blocking only the
+  `claude-code` ServiceAccount wouldn't close this either: `edit` also lets a
+  tenant create other ServiceAccounts (and RoleBindings to any Role they
+  already hold) in their own namespace and use those instead. `deploy/
+  networkpolicy-protection.yaml` closes this with a `ValidatingAdmissionPolicy`
+  that denies every create/update/delete of a NetworkPolicy in a
+  tenant-portal-managed namespace regardless of which identity sends the
+  request, except the `tenant-portal` provisioner itself (and namespace
+  teardown, checked via the namespace's `deletionTimestamp` rather than the
+  namespace controller's identity). `edit` still stays in sync with upstream
+  as a result. Cluster-scoped like `rbac.yaml`, so it needs the same
+  apply-by-hand-with-cluster-admin path (`make -C deploy
+  networkpolicy-protection`) -- this repo's own deploy credentials can't grant
+  it to themselves.

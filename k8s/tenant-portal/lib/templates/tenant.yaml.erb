@@ -30,7 +30,9 @@ metadata:
 # A RoleBinding (not ClusterRoleBinding) to the built-in `edit` ClusterRole:
 # full read/write on ordinary workloads, but only inside this one namespace, and
 # the rule list stays in sync with upstream as new resource types are aggregated
-# into `edit`.
+# into `edit`. This includes NetworkPolicy CRUD, which would otherwise let a
+# tenant remove their own isolation below -- see
+# deploy/networkpolicy-protection.yaml.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
