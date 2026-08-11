@@ -1,0 +1,54 @@
+# Blocking writes from just the `claude-code` ServiceAccount would not be
+# enough: a tenant holds `edit` in their own namespace, which includes
+# creating ServiceAccounts (and RoleBindings to any Role the tenant already
+# effectively holds), so they could mint a second identity and use that
+# instead. The only durable boundary is the resource itself -- deny every
+# create/update/delete of a NetworkPolicy in a tenant-portal-managed
+# namespace, from any principal except the provisioner, regardless of which
+# identity sends the request.
+#
+# This also has to cover NetworkPolicy objects other than `namespace-isolation`
+# by name: NetworkPolicy selecting the same pod are additive (a second, wide-open
+# policy would restore access the first policy denies), so scoping this to one
+# resourceName would leave that door open.
+#
+# Cluster-scoped (ValidatingAdmissionPolicy/Binding are non-namespaced), so
+# this needs the same apply-by-hand-with-cluster-admin path as rbac.yaml's
+# ClusterRole/ClusterRoleBinding -- the tenant-portal ServiceAccount cannot
+# grant this to itself.
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: tenant-portal-networkpolicy-protection
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    namespaceSelector:
+      matchLabels:
+        app.kubernetes.io/managed-by: tenant-portal
+    resourceRules:
+      - apiGroups: ["networking.k8s.io"]
+        apiVersions: ["v1"]
+        operations: ["CREATE", "UPDATE", "DELETE"]
+        resources: ["networkpolicies"]
+  validations:
+    # Namespace deletion cascades to a real DELETE of every object it contains,
+    # sent by the namespace controller's own identity rather than the
+    # provisioner's -- allowed here by checking the namespace is already
+    # terminating, so cleanup on tenant teardown isn't blocked, without having
+    # to hardcode that controller's username.
+    - expression: >
+        request.userInfo.username == "system:serviceaccount:default:tenant-portal" ||
+        (request.operation == "DELETE" && has(namespaceObject.metadata.deletionTimestamp))
+      message: >
+        NetworkPolicy objects in tenant-portal-managed namespaces may only be
+        written by the tenant-portal provisioner. See k8s/tenant-portal README
+        "Known gaps".
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: tenant-portal-networkpolicy-protection
+spec:
+  policyName: tenant-portal-networkpolicy-protection
+  validationActions: ["Deny"]

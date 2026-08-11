@@ -18,6 +18,9 @@ pvc:
 rbac:
 	kubectl apply -f rbac.yaml
 
+networkpolicy-protection:
+	kubectl apply -f networkpolicy-protection.yaml
+
 # Created once and then left alone: rotating SECRET_KEY_BASE logs everyone out
 # and rotating PORTAL_PASSWORD changes the shared password on every deploy.
 # Pass PORTAL_PASSWORD=... to choose it, or let it be generated and read it back
@@ -31,7 +34,7 @@ secret:
 password:
 	@kubectl get secret tenant-portal-secrets -o jsonpath='{.data.PORTAL_PASSWORD}' | base64 -d; echo
 
-deploy: pvc rbac secret
+deploy: pvc rbac networkpolicy-protection secret
 	IMAGE=$(IMAGE) CLAUDE_CODE_IMAGE=$(CLAUDE_CODE_IMAGE) \
 		envsubst '$${IMAGE} $${CLAUDE_CODE_IMAGE}' < deployment.yaml | kubectl apply -f -
 	kubectl apply -f service.yaml
