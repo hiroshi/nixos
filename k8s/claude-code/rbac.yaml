@@ -61,3 +61,33 @@ roleRef:
   kind: Role
   name: claude-code-monitoring-pod-logs
   apiGroup: rbac.authorization.k8s.io
+---
+# `edit` doesn't cover cluster-scoped resources, so this SA can't get/patch
+# the tenant-portal ClusterRole at all, let alone apply rules (like
+# NetworkPolicy CRUD) it doesn't itself hold -- RBAC's escalation check
+# refuses that regardless of get/patch access. `escalate` grants only the
+# right to write rules this SA doesn't hold into that one named ClusterRole;
+# it does not grant those rules to this SA itself, so claude-code still
+# can't touch namespaces/serviceaccounts/etc. cluster-wide as a side effect.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: claude-code-tenant-portal-rbac-escalate
+rules:
+  - apiGroups: ["rbac.authorization.k8s.io"]
+    resources: ["clusterroles"]
+    resourceNames: ["tenant-portal"]
+    verbs: ["get", "patch", "update", "escalate"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: claude-code-tenant-portal-rbac-escalate
+subjects:
+  - kind: ServiceAccount
+    name: claude-code
+    namespace: default
+roleRef:
+  kind: ClusterRole
+  name: claude-code-tenant-portal-rbac-escalate
+  apiGroup: rbac.authorization.k8s.io
