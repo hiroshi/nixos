@@ -22,7 +22,7 @@ class TenantProvisioner
   STORAGE_SIZE = ENV.fetch("TENANT_STORAGE_SIZE", "1Gi")
 
   Context = Struct.new(
-    :namespace, :tenant_name, :image, :capacity, :storage_size, :supervisor_source,
+    :namespace, :tenant_name, :image, :capacity, :storage_size, :supervisor_source, :api_server_ip,
     keyword_init: true
   ) do
     def render(template)
@@ -69,7 +69,8 @@ class TenantProvisioner
       image: CLAUDE_CODE_IMAGE,
       capacity: CAPACITY,
       storage_size: STORAGE_SIZE,
-      supervisor_source: SUPERVISOR_PATH.read
+      supervisor_source: SUPERVISOR_PATH.read,
+      api_server_ip: api_server_ip
     ).render(TEMPLATE_PATH.read)
   end
 
@@ -77,6 +78,17 @@ class TenantProvisioner
 
   def namespace
     @client.get("Namespace", @tenant.namespace)
+  end
+
+  # k3s exposes no pod for the API server; its real (node) address lives on the
+  # core Endpoints object of the same name, in the default namespace, alongside
+  # the `kubernetes` Service. Never hardcode this -- see the NetworkPolicy
+  # comment in the template for why.
+  def api_server_ip
+    endpoints = @client.get("Endpoints", "kubernetes", namespace: "default")
+    endpoints&.dig("subsets", 0, "addresses", 0, "ip") ||
+      raise(Error, "could not determine the Kubernetes API server's address " \
+        "(no addresses on the default/kubernetes Endpoints object)")
   end
 
   # Applying into a namespace this app didn't create would reconfigure whatever

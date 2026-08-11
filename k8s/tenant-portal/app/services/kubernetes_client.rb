@@ -41,8 +41,11 @@ class KubernetesClient
 
   Resource = Struct.new(:prefix, :plural, :namespaced)
 
-  # Only the kinds lib/templates/tenant.yaml.erb renders. An unknown kind is a
-  # bug in the template, not something to route dynamically via discovery.
+  # The kinds lib/templates/tenant.yaml.erb renders, plus Endpoints, which is
+  # never applied -- only read, by TenantProvisioner#manifests, to discover the
+  # Kubernetes API server's real address before rendering it into a
+  # NetworkPolicy egress rule. An unrecognized kind is still a bug in the
+  # caller, not something to route dynamically via discovery.
   RESOURCES = {
     "Namespace" => Resource.new("/api/v1", "namespaces", false),
     "ServiceAccount" => Resource.new("/api/v1", "serviceaccounts", true),
@@ -50,7 +53,9 @@ class KubernetesClient
     "Service" => Resource.new("/api/v1", "services", true),
     "PersistentVolumeClaim" => Resource.new("/api/v1", "persistentvolumeclaims", true),
     "Deployment" => Resource.new("/apis/apps/v1", "deployments", true),
-    "RoleBinding" => Resource.new("/apis/rbac.authorization.k8s.io/v1", "rolebindings", true)
+    "RoleBinding" => Resource.new("/apis/rbac.authorization.k8s.io/v1", "rolebindings", true),
+    "NetworkPolicy" => Resource.new("/apis/networking.k8s.io/v1", "networkpolicies", true),
+    "Endpoints" => Resource.new("/api/v1", "endpoints", true)
   }.freeze
 
   # Server-Side Apply of one parsed manifest document.
