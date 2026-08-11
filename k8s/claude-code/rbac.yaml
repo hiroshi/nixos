@@ -64,10 +64,20 @@ roleRef:
 ---
 # Cluster-scoped ClusterRole/ClusterRoleBinding objects can't be granted via a
 # namespace-scoped Role, hence the ClusterRole+ClusterRoleBinding here. No
-# escalate/bind verbs: Kubernetes' built-in escalation check means claude-code
-# can still only create/update ClusterRoles and ClusterRoleBindings that grant
-# permissions it already holds (edit in default, view+pods/log in monitoring),
-# so this can't be used to self-grant cluster-admin.
+# blanket escalate/bind verbs: Kubernetes' built-in escalation check means
+# claude-code can still only create/update ClusterRoles and
+# ClusterRoleBindings that grant permissions it already holds (edit in
+# default, view+pods/log in monitoring), so this can't be used to self-grant
+# cluster-admin.
+#
+# The one exception is `escalate` on the tenant-portal ClusterRole by name:
+# k8s/tenant-portal/deploy/rbac.yaml grants that ClusterRole rules (e.g.
+# NetworkPolicy CRUD, for #49) this SA doesn't hold itself, and the
+# escalation check blocks writing those without it. `escalate` only allows
+# writing rules this SA doesn't hold into that one named ClusterRole -- it
+# does not grant those rules to this SA itself, so claude-code still can't
+# touch namespaces/serviceaccounts/services/etc. cluster-wide as a side
+# effect the way holding the underlying permissions directly would.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
@@ -76,6 +86,10 @@ rules:
   - apiGroups: ["rbac.authorization.k8s.io"]
     resources: ["clusterroles", "clusterrolebindings"]
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: ["rbac.authorization.k8s.io"]
+    resources: ["clusterroles"]
+    resourceNames: ["tenant-portal"]
+    verbs: ["escalate"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
