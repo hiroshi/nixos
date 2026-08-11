@@ -18,17 +18,19 @@ roleRef:
   name: edit
   apiGroup: rbac.authorization.k8s.io
 ---
-# Read-only access into `monitoring` so the claude-code pod can inspect the
-# VictoriaMetrics/VictoriaLogs/Perses/otel-collector stack (kubectl get/logs)
-# without kubectl port-forward or the Service-DNS+urllib workaround. Binds
-# the built-in `view` ClusterRole (kept in sync with upstream automatically
-# as new resource types are aggregated into it) plus a small supplemental
-# Role for `pods/log`, which `view` deliberately excludes by default.
+# Read-only access cluster-wide (including tenant-portal-managed tenant
+# namespaces, for verifying NetworkPolicy isolation from inside a tenant
+# pod, and `monitoring`, to inspect the VictoriaMetrics/VictoriaLogs/Perses/
+# otel-collector stack) without kubectl port-forward or the Service-DNS+
+# urllib workaround. Binds the built-in `view` ClusterRole (kept in sync
+# with upstream automatically as new resource types are aggregated into it)
+# plus a small supplemental ClusterRole for `pods/log` and `pods/exec`,
+# which `view` deliberately excludes by default. Supersedes the old
+# `monitoring`-namespace-scoped bindings of the same shape.
 apiVersion: rbac.authorization.k8s.io/v1
-kind: RoleBinding
+kind: ClusterRoleBinding
 metadata:
-  name: claude-code-monitoring-view
-  namespace: monitoring
+  name: claude-code-view
 subjects:
   - kind: ServiceAccount
     name: claude-code
@@ -39,25 +41,26 @@ roleRef:
   apiGroup: rbac.authorization.k8s.io
 ---
 apiVersion: rbac.authorization.k8s.io/v1
-kind: Role
+kind: ClusterRole
 metadata:
-  name: claude-code-monitoring-pod-logs
-  namespace: monitoring
+  name: claude-code-pod-exec
 rules:
   - apiGroups: [""]
     resources: ["pods/log"]
     verbs: ["get", "list"]
+  - apiGroups: [""]
+    resources: ["pods/exec"]
+    verbs: ["create"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
-kind: RoleBinding
+kind: ClusterRoleBinding
 metadata:
-  name: claude-code-monitoring-pod-logs
-  namespace: monitoring
+  name: claude-code-pod-exec
 subjects:
   - kind: ServiceAccount
     name: claude-code
     namespace: default
 roleRef:
-  kind: Role
-  name: claude-code-monitoring-pod-logs
+  kind: ClusterRole
+  name: claude-code-pod-exec
   apiGroup: rbac.authorization.k8s.io
