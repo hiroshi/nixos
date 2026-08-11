@@ -64,3 +64,29 @@ roleRef:
   kind: ClusterRole
   name: claude-code-pod-exec
   apiGroup: rbac.authorization.k8s.io
+---
+# `view` deliberately excludes RBAC resources, so without this claude-code
+# can't even `kubectl get clusterrole`/`clusterrolebinding` to check what's
+# granted where -- read-only, no write/escalate/bind, so this can't be used
+# to self-grant anything, just to see the current state.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: claude-code-rbac-view
+rules:
+  - apiGroups: ["rbac.authorization.k8s.io"]
+    resources: ["clusterroles", "clusterrolebindings", "roles", "rolebindings"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: claude-code-rbac-view
+subjects:
+  - kind: ServiceAccount
+    name: claude-code
+    namespace: default
+roleRef:
+  kind: ClusterRole
+  name: claude-code-rbac-view
+  apiGroup: rbac.authorization.k8s.io
