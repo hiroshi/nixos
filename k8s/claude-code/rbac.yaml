@@ -61,3 +61,31 @@ roleRef:
   kind: Role
   name: claude-code-monitoring-pod-logs
   apiGroup: rbac.authorization.k8s.io
+---
+# Cluster-scoped ClusterRole/ClusterRoleBinding objects can't be granted via a
+# namespace-scoped Role, hence the ClusterRole+ClusterRoleBinding here. No
+# escalate/bind verbs: Kubernetes' built-in escalation check means claude-code
+# can still only create/update ClusterRoles and ClusterRoleBindings that grant
+# permissions it already holds (edit in default, view+pods/log in monitoring),
+# so this can't be used to self-grant cluster-admin.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: claude-code-rbac-admin
+rules:
+  - apiGroups: ["rbac.authorization.k8s.io"]
+    resources: ["clusterroles", "clusterrolebindings"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: claude-code-rbac-admin
+subjects:
+  - kind: ServiceAccount
+    name: claude-code
+    namespace: default
+roleRef:
+  kind: ClusterRole
+  name: claude-code-rbac-admin
+  apiGroup: rbac.authorization.k8s.io
