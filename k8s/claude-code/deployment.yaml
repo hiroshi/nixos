@@ -4,13 +4,6 @@ metadata:
   name: claude-code-dockerd-daemon-config
   namespace: default
 data:
-  # Bounds BuildKit's build cache with its own opportunistic GC, which runs
-  # after builds complete and only ever reclaims cache entries not locked by
-  # an in-progress build -- safer than an external prune cronjob that could
-  # race a running build. docker-data (see kata.nix) is a fixed 20G LV, and
-  # an unbounded build cache filled it and crashed the pod's Kata sandbox on
-  # 2026-08-16 (build cache alone reached 13.76GB); see hiroshi/nixos issue
-  # tracker / project memory for the incident writeup.
   daemon.json: |
     {
       "builder": {
