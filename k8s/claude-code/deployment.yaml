@@ -1,3 +1,26 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: claude-code-dockerd-daemon-config
+  namespace: default
+data:
+  # Bounds BuildKit's build cache with its own opportunistic GC, which runs
+  # after builds complete and only ever reclaims cache entries not locked by
+  # an in-progress build -- safer than an external prune cronjob that could
+  # race a running build. docker-data (see kata.nix) is a fixed 20G LV, and
+  # an unbounded build cache filled it and crashed the pod's Kata sandbox on
+  # 2026-08-16 (build cache alone reached 13.76GB); see hiroshi/nixos issue
+  # tracker / project memory for the incident writeup.
+  daemon.json: |
+    {
+      "builder": {
+        "gc": {
+          "enabled": true,
+          "defaultKeepStorage": "${DOCKERD_GC_KEEP_STORAGE}"
+        }
+      }
+    }
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -115,6 +138,13 @@ spec:
             # previous tmpfs emptyDir did.
             - name: docker-data
               mountPath: /var/lib/docker
+            # subPath so only this one file is mounted, not the whole
+            # /etc/docker directory -- avoids clobbering anything the dind
+            # entrypoint might place there.
+            - name: dockerd-daemon-config
+              mountPath: /etc/docker/daemon.json
+              subPath: daemon.json
+              readOnly: true
         - name: docker-df-exporter
           # `docker system df`'s numbers (images/containers/volumes/build
           # cache disk usage) aren't visible through the existing OTel
@@ -149,3 +179,6 @@ spec:
             # this literal path string, not on the underlying LV/device.
             path: /var/lib/kata-directvol/claude-code-docker-data
             type: DirectoryOrCreate
+        - name: dockerd-daemon-config
+          configMap:
+            name: claude-code-dockerd-daemon-config

@@ -7,6 +7,11 @@ IMAGE = $(REGISTRY):$(TAG)
 DOCKER_DF_EXPORTER_REGISTRY := ghcr.io/hiroshi/claude-code-docker-df-exporter
 DOCKER_DF_EXPORTER_IMAGE = $(DOCKER_DF_EXPORTER_REGISTRY):$(TAG)
 
+# dockerd's BuildKit build-cache GC cap (see deployment.yaml's
+# claude-code-dockerd-daemon-config ConfigMap) -- docker-data is a fixed 20G
+# LV (kata.nix), so this needs to leave real headroom for images too.
+DOCKERD_GC_KEEP_STORAGE ?= 5GB
+
 build:
 	docker build --platform linux/amd64 -t $(IMAGE) ./
 
@@ -37,4 +42,5 @@ enable-remote-control: claude-code-run
 
 deploy: pvc rbac
 	IMAGE=$(IMAGE) DOCKER_DF_EXPORTER_IMAGE=$(DOCKER_DF_EXPORTER_IMAGE) \
-		envsubst '$${IMAGE} $${DOCKER_DF_EXPORTER_IMAGE}' < deployment.yaml | kubectl apply -f -
+		DOCKERD_GC_KEEP_STORAGE=$(DOCKERD_GC_KEEP_STORAGE) \
+		envsubst '$${IMAGE} $${DOCKER_DF_EXPORTER_IMAGE} $${DOCKERD_GC_KEEP_STORAGE}' < deployment.yaml | kubectl apply -f -
