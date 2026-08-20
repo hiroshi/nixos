@@ -91,18 +91,31 @@ spec:
           # this out of memory with no limit set here, since without a
           # per-container limit Kata never hotplugs guest memory for it.
           #
-          # docker-data is now a real block-backed volume (see below), not
-          # tmpfs, so image layers/build cache no longer count against this
-          # cgroup limit the way tmpfs pages did -- the previous 8Gi/4Gi
-          # split existed purely to leave headroom above the old tmpfs
-          # sizeLimit (hiroshi/nixos#19) and is no longer needed for that
-          # reason, but left as-is here since dockerd's own real memory
-          # needs under load haven't been separately profiled yet.
+          # Sized down 8Gi -> 4Gi after a 2026-08-20 sandbox death: because
+          # Kata sizes the guest VM as default_memory + the sum of every
+          # container's limit, the old 4Gi + 8Gi + 64Mi split made the guest
+          # claim 14.0GiB (confirmed by /proc/meminfo inside the guest:
+          # MemTotal = 14683736 kB) out of the host's 15.26GiB of physical
+          # RAM -- 92% of the machine, leaving nothing for the host kernel,
+          # k3s and the monitoring stack. A Nix-heavy `docker build` then
+          # grew this container's working set 0.15 -> 3.4GiB in ~3 minutes;
+          # since the guest kernel believes it has 14GiB it keeps growing
+          # page cache instead of reclaiming, so QEMU's RSS squeezed the
+          # host (node MemAvailable 8.5 -> 4.7GiB) until kata-agent stopped
+          # answering and the whole sandbox was torn down ("Dead agent"),
+          # killing every session in it.
+          #
+          # 4Gi keeps the guest total at ~9.9GiB, which fits the host with
+          # room to spare, and turns an over-large build into a contained,
+          # visible failure (cgroup reclaim, at worst an OOMKilled dockerd)
+          # instead of an unexplained VM death. Most of the 3.4GiB above was
+          # page cache from writes to docker-data, which is reclaimable
+          # under a cgroup limit rather than fatal.
           resources:
             requests:
               memory: 4Gi
             limits:
-              memory: 8Gi
+              memory: 4Gi
           # Only docker.sock needs to be shared with the claude-code
           # container, so it gets its own subdirectory instead of all of
           # /var/run. Sharing the whole of /var/run would also share
