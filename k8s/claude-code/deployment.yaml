@@ -39,6 +39,13 @@ spec:
       labels:
         app: claude-code
     spec:
+      # claude.ai/code names each new remote-control session after the pod
+      # hostname, which defaults to the pod name and so reads as a
+      # meaningless template hash. Tenant pods already set this to their
+      # namespace (see k8s/tenant-portal/lib/templates/tenant.yaml.erb); this
+      # pod lives in `default`, so "rc-default" keeps it distinguishable from
+      # the tenant-* sessions in the same sidebar.
+      hostname: rc-default
       # Runs the whole pod inside a Kata Containers hardware VM, so the
       # dockerd sidecar's `privileged: true` is contained by the hypervisor
       # boundary instead of just Linux namespaces/capabilities.
