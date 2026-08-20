@@ -164,6 +164,17 @@ spec:
           # Prometheus import endpoint on a timer. Image source:
           # docker-df-exporter/ (built/pushed via this dir's Makefile).
           image: ${DOCKER_DF_EXPORTER_IMAGE}
+          env:
+            # The same loop also garbage-collects images, because dockerd has
+            # none of its own: nothing here ever reclaims an image it isn't
+            # running, so every per-commit build tag stayed on the docker-data
+            # LV forever. Policy is "keep the newest N tags per repository"
+            # rather than dockerd's own age-based prune filter -- image-gc.sh
+            # documents why age doesn't work for base images.
+            - name: IMAGE_GC_KEEP_PER_REPO
+              value: "2"
+            - name: IMAGE_GC_INTERVAL_SECONDS
+              value: "3600"
           resources:
             requests:
               memory: 32Mi
