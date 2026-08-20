@@ -31,12 +31,16 @@ ENV GIT_SSL_CAINFO=/etc/ssl/certs/ca-bundle.crt
 
 # scratch has no /etc/passwd, so create a non-root user (claude, uid/gid 1000)
 # ourselves. Own HOME by that user since it's used as a PV mount point.
-RUN mkdir -p /home/claude/workspace /tmp && \
+RUN mkdir -p /home/claude/rc-default /tmp && \
     echo "claude:x:1000:1000:claude:/home/claude:/usr/bin/bash" > /etc/passwd && \
     echo "claude:x:1000:" > /etc/group && \
     chown -R 1000:1000 /home/claude && \
     chmod 1777 /tmp
 
 USER claude
-WORKDIR /home/claude/workspace
+# claude.ai/code groups sessions in its sidebar by the basename of the
+# directory remote-control runs in, so this path doubles as that label.
+# "rc-default" (remote control, `default` namespace) says which environment
+# the sessions belong to; the previous "workspace" said nothing.
+WORKDIR /home/claude/rc-default
 ENTRYPOINT ["/usr/bin/claude"]
